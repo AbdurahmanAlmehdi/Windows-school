@@ -46,3 +46,24 @@ public enum UserRole
     Staff,
     Manager
 }
+
+public enum PaymentStatus
+{
+    Pending,
+    Paid,
+    Refunded
+}
+
+public enum PaymentMethod
+{
+    Cash,
+    CreditCard,
+    DebitCard,
+    BankTransfer
+}
+
+public enum InvoiceLineCategory
+{
+    RoomCharge,
+    RestaurantCharge
+}

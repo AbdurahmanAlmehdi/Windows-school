@@ -41,4 +41,22 @@ public static class AppColors
         Models.OrderStatus.Cancelled => StatusOOS,
         _ => Gray500
     };
+
+    public static Color GetPaymentStatusColor(Models.PaymentStatus status) => status switch
+    {
+        Models.PaymentStatus.Paid => Tertiary,
+        Models.PaymentStatus.Pending => Accent,
+        Models.PaymentStatus.Refunded => StatusOOS,
+        _ => Gray500
+    };
+
+    public static Color GetReservationStatusColor(Models.ReservationStatus status) => status switch
+    {
+        Models.ReservationStatus.Confirmed => Tertiary,
+        Models.ReservationStatus.CheckedIn => Primary,
+        Models.ReservationStatus.Completed => Gray400,
+        Models.ReservationStatus.Cancelled => StatusOOS,
+        Models.ReservationStatus.Pending => Accent,
+        _ => Gray500
+    };
 }

@@ -13,6 +13,7 @@ public partial class MainForm : Form
     private readonly BookingService _bookingService;
     private readonly RestaurantService _restaurantService;
     private readonly ReportService _reportService;
+    private readonly InvoiceService _invoiceService;
     private readonly DataStore _store;
 
     private Guest? _lookedUpGuest;
@@ -24,6 +25,7 @@ public partial class MainForm : Form
         BookingService bookingService,
         RestaurantService restaurantService,
         ReportService reportService,
+        InvoiceService invoiceService,
         DataStore dataStore)
     {
         _authService = authService;
@@ -31,6 +33,7 @@ public partial class MainForm : Form
         _bookingService = bookingService;
         _restaurantService = restaurantService;
         _reportService = reportService;
+        _invoiceService = invoiceService;
         _store = dataStore;
 
         InitializeComponent();
@@ -61,6 +64,7 @@ public partial class MainForm : Form
         else if (tabMain.SelectedTab == tabReservations) RefreshReservations();
         else if (tabMain.SelectedTab == tabRooms) RefreshRooms();
         else if (tabMain.SelectedTab == tabRestaurant) RefreshRestaurant();
+        else if (tabMain.SelectedTab == tabFinances) RefreshFinances();
         else if (tabMain.SelectedTab == tabReports) RefreshReports();
     }
 
@@ -449,9 +453,13 @@ public partial class MainForm : Form
     {
         if (sender is not Button btn || btn.Tag is not Stay stay) return;
 
-        var total = _bookingService.CheckOut(stay);
-        MessageBox.Show($"Guest {stay.Guest.Name} checked out.\nTotal charges: ${total:F2}",
-            "Check Out", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        _bookingService.CheckOut(stay);
+        var invoice = _invoiceService.GenerateInvoice(stay);
+        using var form = new CheckoutForm(invoice);
+        if (form.ShowDialog(this) == DialogResult.OK)
+        {
+            _invoiceService.MarkPaid(invoice, form.SelectedPaymentMethod);
+        }
         RefreshDashboard();
     }
 
@@ -492,6 +500,22 @@ public partial class MainForm : Form
         lblResStatus.Text = $"{_filteredReservations.Count} reservation(s)";
         UpdateResButtons();
         RefreshRoomCombo();
+        RefreshResKPIs();
+    }
+
+    private void RefreshResKPIs()
+    {
+        var today = DateTime.Today;
+        var arrivalsToday = _store.Reservations.Count(r => r.CheckInDate.Date == today && r.Status == ReservationStatus.Confirmed);
+        var activeStays = _store.Stays.Count(s => s.Status == StayStatus.Active);
+        var pendingRes = _store.Reservations.Count(r => r.Status is ReservationStatus.Confirmed or ReservationStatus.Pending);
+        var completedToday = _store.Reservations.Count(r => r.Status == ReservationStatus.Completed &&
+            _store.Stays.Any(s => s.Guest == r.Guest && s.Room == r.Room && s.ActualCheckOut?.Date == today));
+
+        lblResKpiArrivals.Text = arrivalsToday.ToString();
+        lblResKpiActive.Text = activeStays.ToString();
+        lblResKpiPending.Text = pendingRes.ToString();
+        lblResKpiCompleted.Text = completedToday.ToString();
     }
 
     private void RefreshRoomCombo()
@@ -553,9 +577,13 @@ public partial class MainForm : Form
             s.Guest == res.Guest && s.Room == res.Room && s.Status == StayStatus.Active);
         if (stay == null) return;
 
-        var total = _bookingService.CheckOut(stay);
-        MessageBox.Show($"Guest {stay.Guest.Name} checked out.\nTotal charges: ${total:F2}",
-            "Check Out", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        _bookingService.CheckOut(stay);
+        var invoice = _invoiceService.GenerateInvoice(stay);
+        using var form = new CheckoutForm(invoice);
+        if (form.ShowDialog(this) == DialogResult.OK)
+        {
+            _invoiceService.MarkPaid(invoice, form.SelectedPaymentMethod);
+        }
         RefreshReservations();
     }
 
@@ -863,6 +891,127 @@ public partial class MainForm : Form
         {
             _restaurantService.CancelOrder(order);
             RefreshOrdersGrid();
+        }
+    }
+
+    // ===================== FINANCES =====================
+
+    private List<Invoice> _filteredInvoices = new();
+
+    private void RefreshFinances()
+    {
+        RefreshFinanceKPIs();
+        RefreshInvoiceGrid();
+    }
+
+    private void RefreshFinanceKPIs()
+    {
+        lblFinTotalRev.Text = $"${_invoiceService.GetTotalRevenue():F2}";
+        lblFinUnpaid.Text = _invoiceService.GetUnpaidInvoices().Count.ToString();
+        lblFinPaidToday.Text = $"${_invoiceService.GetTodayRevenue():F2}";
+        lblFinOutstanding.Text = $"${_invoiceService.GetOutstandingAmount():F2}";
+    }
+
+    private void RefreshInvoiceGrid()
+    {
+        var filter = cmbFinFilter.SelectedItem?.ToString() ?? "All";
+
+        _filteredInvoices = filter == "All"
+            ? _store.Invoices.ToList()
+            : _store.Invoices
+                .Where(i => i.PaymentStatus.ToString() == filter)
+                .ToList();
+
+        dgvInvoices.Rows.Clear();
+        foreach (var inv in _filteredInvoices)
+        {
+            dgvInvoices.Rows.Add(
+                inv.InvoiceNumber,
+                inv.Guest.Name,
+                inv.Room.Number,
+                $"${inv.Total:F2}",
+                inv.PaymentStatus.ToString());
+        }
+
+        UpdateFinanceButtons();
+    }
+
+    private void UpdateFinanceButtons()
+    {
+        var inv = GetSelectedInvoice();
+        btnViewInvoice.Enabled = inv != null;
+        btnMarkPaid.Enabled = inv != null && inv.PaymentStatus == PaymentStatus.Pending;
+    }
+
+    private Invoice? GetSelectedInvoice()
+    {
+        if (dgvInvoices.CurrentRow == null) return null;
+        var idx = dgvInvoices.CurrentRow.Index;
+        return idx >= 0 && idx < _filteredInvoices.Count ? _filteredInvoices[idx] : null;
+    }
+
+    private void CmbFinFilter_Changed(object? sender, EventArgs e) => RefreshInvoiceGrid();
+
+    private void DgvInvoices_SelectionChanged(object? sender, EventArgs e) => UpdateFinanceButtons();
+
+    private void BtnViewInvoice_Click(object? sender, EventArgs e)
+    {
+        var inv = GetSelectedInvoice();
+        if (inv == null) return;
+
+        using var form = new CheckoutForm(inv, isReadOnly: true);
+        form.ShowDialog(this);
+    }
+
+    private void BtnMarkPaid_Click(object? sender, EventArgs e)
+    {
+        var inv = GetSelectedInvoice();
+        if (inv == null || inv.PaymentStatus != PaymentStatus.Pending) return;
+
+        using var picker = new Form
+        {
+            Text = "Select Payment Method",
+            Size = new Size(320, 180),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false
+        };
+
+        var cmb = new ComboBox
+        {
+            Font = new Font("Segoe UI", 11),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(20, 30),
+            Size = new Size(260, 30)
+        };
+        foreach (var pm in Enum.GetValues<PaymentMethod>())
+            cmb.Items.Add(pm.ToString());
+        cmb.SelectedIndex = 0;
+
+        var btnOk = new Button
+        {
+            Text = "Mark as Paid",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(140, 36),
+            Location = new Point(20, 80),
+            DialogResult = DialogResult.OK,
+            Cursor = Cursors.Hand
+        };
+        btnOk.FlatAppearance.BorderSize = 0;
+
+        picker.Controls.Add(cmb);
+        picker.Controls.Add(btnOk);
+        picker.AcceptButton = btnOk;
+
+        if (picker.ShowDialog(this) == DialogResult.OK)
+        {
+            var method = Enum.Parse<PaymentMethod>(cmb.SelectedItem!.ToString()!);
+            _invoiceService.MarkPaid(inv, method);
+            RefreshFinances();
         }
     }
 

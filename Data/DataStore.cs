@@ -12,6 +12,7 @@ public class DataStore
     public BindingList<MenuItem> MenuItems { get; } = new();
     public BindingList<RestaurantOrder> Orders { get; } = new();
     public BindingList<User> Users { get; } = new();
+    public BindingList<Invoice> Invoices { get; } = new();
 
     public DataStore()
     {

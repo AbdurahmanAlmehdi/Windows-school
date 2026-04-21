@@ -17,6 +17,7 @@ static class Program
         var bookingService = new BookingService(dataStore, roomService);
         var restaurantService = new RestaurantService(dataStore);
         var reportService = new ReportService(dataStore);
+        var invoiceService = new InvoiceService(dataStore);
 
         using var loginForm = new LoginForm(authService);
         Application.Run(loginForm);
@@ -25,7 +26,7 @@ static class Program
         {
             Application.Run(new MainForm(
                 authService, roomService, bookingService,
-                restaurantService, reportService, dataStore));
+                restaurantService, reportService, invoiceService, dataStore));
         }
     }
 }

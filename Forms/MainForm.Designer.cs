@@ -1,4 +1,5 @@
 using System.Drawing.Drawing2D;
+using HotelManagement.WinForms.Models;
 using HotelManagement.WinForms.Theme;
 
 namespace HotelManagement.WinForms.Forms;
@@ -63,7 +64,6 @@ partial class MainForm
     private Button btnCheckIn = null!;
     private Button btnCheckOut = null!;
     private Button btnCancelRes = null!;
-    private GroupBox grpNewRes = null!;
     private TextBox txtPhone = null!;
     private Button btnLookup = null!;
     private Label lblGuestStatus = null!;
@@ -72,6 +72,22 @@ partial class MainForm
     private DateTimePicker dtpCheckIn = null!;
     private DateTimePicker dtpCheckOut = null!;
     private Button btnCreateRes = null!;
+    // Reservation KPI labels
+    private Label lblResKpiArrivals = null!;
+    private Label lblResKpiActive = null!;
+    private Label lblResKpiPending = null!;
+    private Label lblResKpiCompleted = null!;
+
+    // Finances tab
+    private TabPage tabFinances = null!;
+    private Label lblFinTotalRev = null!;
+    private Label lblFinUnpaid = null!;
+    private Label lblFinPaidToday = null!;
+    private Label lblFinOutstanding = null!;
+    private ComboBox cmbFinFilter = null!;
+    private DataGridView dgvInvoices = null!;
+    private Button btnViewInvoice = null!;
+    private Button btnMarkPaid = null!;
 
     // Rooms controls
     private ComboBox cmbRoomFilter = null!;
@@ -169,15 +185,17 @@ partial class MainForm
         };
 
         tabDashboard = new TabPage("Dashboard") { BackColor = AppColors.Surface, Padding = new Padding(16) };
-        tabReservations = new TabPage("Reservations") { BackColor = AppColors.Surface, Padding = new Padding(16) };
+        tabReservations = new TabPage("Reservations") { BackColor = AppColors.Surface, Padding = new Padding(0) };
         tabRooms = new TabPage("Rooms") { BackColor = AppColors.Surface, Padding = new Padding(16) };
         tabRestaurant = new TabPage("Restaurant") { BackColor = AppColors.Surface, Padding = new Padding(16) };
+        tabFinances = new TabPage("Finances") { BackColor = AppColors.Surface, Padding = new Padding(0) };
         tabReports = new TabPage("Reports") { BackColor = AppColors.Surface, Padding = new Padding(16) };
 
         tabMain.TabPages.Add(tabDashboard);
         tabMain.TabPages.Add(tabReservations);
         tabMain.TabPages.Add(tabRooms);
         tabMain.TabPages.Add(tabRestaurant);
+        tabMain.TabPages.Add(tabFinances);
         tabMain.TabPages.Add(tabReports);
         tabMain.SelectedIndexChanged += TabMain_SelectedIndexChanged;
 
@@ -185,6 +203,7 @@ partial class MainForm
         InitReservationsTab();
         InitRoomsTab();
         InitRestaurantTab();
+        InitFinancesTab();
         InitReportsTab();
 
         Controls.Add(tabMain);
@@ -239,7 +258,7 @@ partial class MainForm
         pnlWelcomeBar = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 60,
+            Height = 70,
             BackColor = AppColors.Primary,
             Padding = new Padding(20, 0, 20, 0)
         };
@@ -259,7 +278,7 @@ partial class MainForm
             Font = new Font("Segoe UI", 10),
             ForeColor = Color.FromArgb(180, 255, 255, 255),
             AutoSize = true,
-            Location = new Point(20, 34)
+            Location = new Point(20, 40)
         };
 
         btnRefreshDash = new Button
@@ -462,53 +481,104 @@ partial class MainForm
 
     private void InitReservationsTab()
     {
+        // === Navy Header Bar ===
+        var pnlResHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 55,
+            BackColor = AppColors.Primary
+        };
+
         var lblResTitle = new Label
         {
             Text = "Reservations",
-            Font = new Font("Segoe UI", 18, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            ForeColor = AppColors.Accent,
             AutoSize = true,
-            Location = new Point(0, 0)
+            Location = new Point(20, 12)
         };
-        tabReservations.Controls.Add(lblResTitle);
-
-        // Filter
-        var lblFilter = new Label
-        {
-            Text = "Filter:",
-            Font = new Font("Segoe UI", 10),
-            Location = new Point(0, 42),
-            AutoSize = true
-        };
-        tabReservations.Controls.Add(lblFilter);
+        pnlResHeader.Controls.Add(lblResTitle);
 
         cmbResFilter = new ComboBox
         {
             Font = new Font("Segoe UI", 10),
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(50, 38),
-            Size = new Size(160, 28)
+            Size = new Size(150, 28),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
         };
-        cmbResFilter.Items.AddRange(new object[] { "All", "Confirmed", "CheckedIn", "Completed", "Cancelled" });
+        cmbResFilter.Items.AddRange(new object[] { "All", "Confirmed", "CheckedIn", "Completed", "Cancelled", "Pending" });
         cmbResFilter.SelectedIndex = 0;
         cmbResFilter.SelectedIndexChanged += CmbResFilter_Changed;
-        tabReservations.Controls.Add(cmbResFilter);
+        pnlResHeader.Controls.Add(cmbResFilter);
+        pnlResHeader.Resize += (s, e) =>
+        {
+            cmbResFilter.Location = new Point(pnlResHeader.Width - cmbResFilter.Width - 20, 14);
+        };
 
+        var lblFilterLbl = new Label
+        {
+            Text = "Filter:",
+            Font = new Font("Segoe UI", 10),
+            ForeColor = Color.FromArgb(180, 255, 255, 255),
+            AutoSize = true,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        pnlResHeader.Controls.Add(lblFilterLbl);
+        pnlResHeader.Resize += (s, e) =>
+        {
+            lblFilterLbl.Location = new Point(pnlResHeader.Width - cmbResFilter.Width - 65, 18);
+        };
+
+        // === KPI Row ===
+        var tblResKPI = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 110,
+            ColumnCount = 4,
+            RowCount = 1,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(12, 8, 12, 0)
+        };
+        tblResKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblResKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblResKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblResKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+
+        Label _discard;
+        var kpiArr = CreateKPICard("Arrivals Today", "0", AppColors.Tertiary, out lblResKpiArrivals, out _discard, false);
+        var kpiAct = CreateKPICard("Active Stays", "0", AppColors.Primary, out lblResKpiActive, out _discard, false);
+        var kpiPend = CreateKPICard("Pending Res.", "0", AppColors.Accent, out lblResKpiPending, out _discard, false);
+        var kpiComp = CreateKPICard("Completed Today", "0", AppColors.Gray500, out lblResKpiCompleted, out _discard, false);
+
+        tblResKPI.Controls.Add(kpiArr, 0, 0);
+        tblResKPI.Controls.Add(kpiAct, 1, 0);
+        tblResKPI.Controls.Add(kpiPend, 2, 0);
+        tblResKPI.Controls.Add(kpiComp, 3, 0);
+
+        // === SplitContainer ===
+        var splitRes = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            SplitterDistance = 650,
+            Orientation = Orientation.Vertical,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(12, 8, 12, 12)
+        };
+
+        // Left: Grid + action buttons
         lblResStatus = new Label
         {
             Text = "",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Tertiary,
-            Location = new Point(230, 42),
+            Location = new Point(0, 0),
             AutoSize = true
         };
-        tabReservations.Controls.Add(lblResStatus);
+        splitRes.Panel1.Controls.Add(lblResStatus);
 
-        // DataGridView
         dgvReservations = new DataGridView
         {
-            Location = new Point(0, 75),
-            Size = new Size(700, 300),
+            Location = new Point(0, 22),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
             ReadOnly = true,
             AllowUserToAddRows = false,
@@ -518,7 +588,8 @@ partial class MainForm
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.FixedSingle,
             RowHeadersVisible = false,
-            Font = new Font("Segoe UI", 10)
+            Font = new Font("Segoe UI", 10),
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(245, 248, 255) }
         };
         dgvReservations.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
         dgvReservations.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
@@ -531,9 +602,43 @@ partial class MainForm
         dgvReservations.Columns.Add("CheckOut", "Check Out");
         dgvReservations.Columns.Add("Status", "Status");
         dgvReservations.SelectionChanged += DgvReservations_SelectionChanged;
-        tabReservations.Controls.Add(dgvReservations);
 
-        // Action buttons
+        // Paint status badges
+        dgvReservations.CellPainting += (s, e) =>
+        {
+            if (e.ColumnIndex == 5 && e.RowIndex >= 0 && e.Value != null)
+            {
+                e.Handled = true;
+                e.PaintBackground(e.CellBounds, true);
+                var statusText = e.Value.ToString()!;
+                if (Enum.TryParse<ReservationStatus>(statusText, out var status))
+                {
+                    var color = AppColors.GetReservationStatusColor(status);
+                    var badgeRect = new Rectangle(e.CellBounds.X + 6, e.CellBounds.Y + 6,
+                        e.CellBounds.Width - 12, e.CellBounds.Height - 12);
+                    using var brush = new SolidBrush(color);
+                    e.Graphics!.FillRectangle(brush, badgeRect);
+                    TextRenderer.DrawText(e.Graphics, statusText, new Font("Segoe UI", 8, FontStyle.Bold),
+                        badgeRect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                }
+            }
+        };
+
+        splitRes.Panel1.Controls.Add(dgvReservations);
+        splitRes.Panel1.Resize += (s, e) =>
+        {
+            dgvReservations.Size = new Size(splitRes.Panel1.Width, splitRes.Panel1.Height - 70);
+        };
+
+        // Action buttons panel
+        var pnlResActions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+
         btnCheckIn = new Button
         {
             Text = "Check In",
@@ -542,14 +647,12 @@ partial class MainForm
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(110, 36),
-            Location = new Point(0, 385),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
             Enabled = false,
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 6, 0)
         };
         btnCheckIn.FlatAppearance.BorderSize = 0;
         btnCheckIn.Click += BtnCheckIn_Click;
-        tabReservations.Controls.Add(btnCheckIn);
 
         btnCheckOut = new Button
         {
@@ -559,14 +662,12 @@ partial class MainForm
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(110, 36),
-            Location = new Point(120, 385),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
             Enabled = false,
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 6, 0)
         };
         btnCheckOut.FlatAppearance.BorderSize = 0;
         btnCheckOut.Click += BtnCheckOut_Click;
-        tabReservations.Controls.Add(btnCheckOut);
 
         btnCancelRes = new Button
         {
@@ -576,28 +677,36 @@ partial class MainForm
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(110, 36),
-            Location = new Point(240, 385),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
             Enabled = false,
             Cursor = Cursors.Hand
         };
         btnCancelRes.FlatAppearance.BorderSize = 0;
         btnCancelRes.Click += BtnCancelRes_Click;
-        tabReservations.Controls.Add(btnCancelRes);
 
-        // New reservation group
-        grpNewRes = new GroupBox
+        pnlResActions.Controls.AddRange(new Control[] { btnCheckIn, btnCheckOut, btnCancelRes });
+        splitRes.Panel1.Controls.Add(pnlResActions);
+
+        // Right: New Reservation card (painted)
+        var pnlNewResCard = new Panel
         {
-            Text = "New Reservation",
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
-            Location = new Point(0, 435),
-            Size = new Size(700, 220),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            Padding = new Padding(8)
         };
+        pnlNewResCard.Paint += DrawingUtilities.PaintCardBackground;
 
-        var lblPhone = new Label { Text = "Phone:", Font = new Font("Segoe UI", 10), Location = new Point(12, 30), AutoSize = true };
-        txtPhone = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(80, 27), Size = new Size(150, 28) };
+        var lblNewResTitle = new Label
+        {
+            Text = "NEW RESERVATION",
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            AutoSize = true,
+            Location = new Point(20, 16)
+        };
+        pnlNewResCard.Controls.Add(lblNewResTitle);
+
+        var lblPhone = new Label { Text = "Phone:", Font = new Font("Segoe UI", 10), Location = new Point(20, 52), AutoSize = true };
+        txtPhone = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(20, 74), Size = new Size(150, 28) };
         btnLookup = new Button
         {
             Text = "Lookup",
@@ -606,7 +715,7 @@ partial class MainForm
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(80, 28),
-            Location = new Point(240, 27),
+            Location = new Point(180, 74),
             Cursor = Cursors.Hand
         };
         btnLookup.FlatAppearance.BorderSize = 0;
@@ -617,27 +726,27 @@ partial class MainForm
             Text = "",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Gray500,
-            Location = new Point(330, 32),
+            Location = new Point(20, 108),
             AutoSize = true
         };
 
-        var lblName = new Label { Text = "Guest Name:", Font = new Font("Segoe UI", 10), Location = new Point(12, 65), AutoSize = true };
-        txtGuestName = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(120, 62), Size = new Size(200, 28), Visible = false };
+        var lblName = new Label { Text = "Guest Name:", Font = new Font("Segoe UI", 10), Location = new Point(20, 130), AutoSize = true };
+        txtGuestName = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(20, 152), Size = new Size(240, 28), Visible = false };
 
-        var lblRoom2 = new Label { Text = "Room:", Font = new Font("Segoe UI", 10), Location = new Point(12, 100), AutoSize = true };
+        var lblRoom2 = new Label { Text = "Room:", Font = new Font("Segoe UI", 10), Location = new Point(20, 190), AutoSize = true };
         cmbRoom = new ComboBox
         {
             Font = new Font("Segoe UI", 10),
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(80, 97),
+            Location = new Point(20, 212),
             Size = new Size(240, 28)
         };
 
-        var lblCI = new Label { Text = "Check In:", Font = new Font("Segoe UI", 10), Location = new Point(12, 135), AutoSize = true };
-        dtpCheckIn = new DateTimePicker { Font = new Font("Segoe UI", 10), Location = new Point(100, 132), Size = new Size(200, 28), Format = DateTimePickerFormat.Short };
+        var lblCI = new Label { Text = "Check In:", Font = new Font("Segoe UI", 10), Location = new Point(20, 252), AutoSize = true };
+        dtpCheckIn = new DateTimePicker { Font = new Font("Segoe UI", 10), Location = new Point(20, 274), Size = new Size(240, 28), Format = DateTimePickerFormat.Short };
 
-        var lblCO = new Label { Text = "Check Out:", Font = new Font("Segoe UI", 10), Location = new Point(320, 135), AutoSize = true };
-        dtpCheckOut = new DateTimePicker { Font = new Font("Segoe UI", 10), Location = new Point(415, 132), Size = new Size(200, 28), Format = DateTimePickerFormat.Short, Value = DateTime.Today.AddDays(1) };
+        var lblCO = new Label { Text = "Check Out:", Font = new Font("Segoe UI", 10), Location = new Point(20, 312), AutoSize = true };
+        dtpCheckOut = new DateTimePicker { Font = new Font("Segoe UI", 10), Location = new Point(20, 334), Size = new Size(240, 28), Format = DateTimePickerFormat.Short, Value = DateTime.Today.AddDays(1) };
 
         btnCreateRes = new Button
         {
@@ -646,21 +755,26 @@ partial class MainForm
             BackColor = AppColors.Accent,
             ForeColor = AppColors.Primary,
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(200, 38),
-            Location = new Point(12, 172),
+            Size = new Size(240, 40),
+            Location = new Point(20, 380),
             Cursor = Cursors.Hand
         };
         btnCreateRes.FlatAppearance.BorderSize = 0;
         btnCreateRes.Click += BtnCreateRes_Click;
 
-        grpNewRes.Controls.AddRange(new Control[] {
+        pnlNewResCard.Controls.AddRange(new Control[] {
             lblPhone, txtPhone, btnLookup, lblGuestStatus,
             lblName, txtGuestName,
             lblRoom2, cmbRoom,
             lblCI, dtpCheckIn, lblCO, dtpCheckOut,
             btnCreateRes
         });
-        tabReservations.Controls.Add(grpNewRes);
+        splitRes.Panel2.Controls.Add(pnlNewResCard);
+
+        // Add in reverse dock order
+        tabReservations.Controls.Add(splitRes);
+        tabReservations.Controls.Add(tblResKPI);
+        tabReservations.Controls.Add(pnlResHeader);
     }
 
     private void InitRoomsTab()
@@ -901,6 +1015,182 @@ partial class MainForm
         split.Panel2.Controls.Add(btnCancelOrder);
 
         tabRestaurant.Controls.Add(split);
+    }
+
+    private void InitFinancesTab()
+    {
+        // === Navy Header ===
+        var pnlFinHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 55,
+            BackColor = AppColors.Primary
+        };
+        var lblFinTitle = new Label
+        {
+            Text = "Finances & Billing",
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            ForeColor = AppColors.Accent,
+            AutoSize = true,
+            Location = new Point(20, 12)
+        };
+        pnlFinHeader.Controls.Add(lblFinTitle);
+
+        // === KPI Row ===
+        var tblFinKPI = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 110,
+            ColumnCount = 4,
+            RowCount = 1,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(12, 8, 12, 0)
+        };
+        tblFinKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblFinKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblFinKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblFinKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+
+        Label _d;
+        var kpiTotalRev = CreateKPICard("Total Revenue", "$0", AppColors.Tertiary, out lblFinTotalRev, out _d, false);
+        var kpiUnpaid = CreateKPICard("Unpaid Bills", "0", AppColors.StatusOOS, out lblFinUnpaid, out _d, false);
+        var kpiPaidToday = CreateKPICard("Paid Today", "$0", AppColors.Accent, out lblFinPaidToday, out _d, false);
+        var kpiOutstanding = CreateKPICard("Outstanding", "$0", AppColors.Primary, out lblFinOutstanding, out _d, false);
+
+        tblFinKPI.Controls.Add(kpiTotalRev, 0, 0);
+        tblFinKPI.Controls.Add(kpiUnpaid, 1, 0);
+        tblFinKPI.Controls.Add(kpiPaidToday, 2, 0);
+        tblFinKPI.Controls.Add(kpiOutstanding, 3, 0);
+
+        // === Content ===
+        var pnlFinContent = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(16, 8, 16, 16)
+        };
+
+        // Filter
+        var lblFinFilterLbl = new Label
+        {
+            Text = "Filter:",
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(0, 4),
+            AutoSize = true
+        };
+        pnlFinContent.Controls.Add(lblFinFilterLbl);
+
+        cmbFinFilter = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(50, 0),
+            Size = new Size(140, 28)
+        };
+        cmbFinFilter.Items.AddRange(new object[] { "All", "Paid", "Pending", "Refunded" });
+        cmbFinFilter.SelectedIndex = 0;
+        cmbFinFilter.SelectedIndexChanged += CmbFinFilter_Changed;
+        pnlFinContent.Controls.Add(cmbFinFilter);
+
+        // Invoice grid
+        dgvInvoices = new DataGridView
+        {
+            Location = new Point(0, 36),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            RowHeadersVisible = false,
+            Font = new Font("Segoe UI", 10),
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(245, 248, 255) }
+        };
+        dgvInvoices.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
+        dgvInvoices.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        dgvInvoices.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+        dgvInvoices.EnableHeadersVisualStyles = false;
+        dgvInvoices.Columns.Add("InvoiceNum", "Invoice #");
+        dgvInvoices.Columns.Add("Guest", "Guest");
+        dgvInvoices.Columns.Add("Room", "Room");
+        dgvInvoices.Columns.Add("Total", "Total");
+        dgvInvoices.Columns.Add("Status", "Status");
+        dgvInvoices.SelectionChanged += DgvInvoices_SelectionChanged;
+
+        // Paint status badges
+        dgvInvoices.CellPainting += (s, e) =>
+        {
+            if (e.ColumnIndex == 4 && e.RowIndex >= 0 && e.Value != null)
+            {
+                e.Handled = true;
+                e.PaintBackground(e.CellBounds, true);
+                var statusText = e.Value.ToString()!;
+                if (Enum.TryParse<PaymentStatus>(statusText, out var status))
+                {
+                    var color = AppColors.GetPaymentStatusColor(status);
+                    var badgeRect = new Rectangle(e.CellBounds.X + 6, e.CellBounds.Y + 6,
+                        e.CellBounds.Width - 12, e.CellBounds.Height - 12);
+                    using var brush = new SolidBrush(color);
+                    e.Graphics!.FillRectangle(brush, badgeRect);
+                    var prefix = status == PaymentStatus.Paid ? "\u2713 " : status == PaymentStatus.Pending ? "\u25CB " : "";
+                    TextRenderer.DrawText(e.Graphics, prefix + statusText, new Font("Segoe UI", 8, FontStyle.Bold),
+                        badgeRect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                }
+            }
+        };
+
+        pnlFinContent.Controls.Add(dgvInvoices);
+        pnlFinContent.Resize += (s, e) =>
+        {
+            dgvInvoices.Size = new Size(pnlFinContent.Width, pnlFinContent.Height - 86);
+        };
+
+        // Buttons
+        var pnlFinActions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false
+        };
+
+        btnViewInvoice = new Button
+        {
+            Text = "View Invoice",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Primary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(130, 36),
+            Enabled = false,
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 6, 0)
+        };
+        btnViewInvoice.FlatAppearance.BorderSize = 0;
+        btnViewInvoice.Click += BtnViewInvoice_Click;
+
+        btnMarkPaid = new Button
+        {
+            Text = "Mark as Paid",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(130, 36),
+            Enabled = false,
+            Cursor = Cursors.Hand
+        };
+        btnMarkPaid.FlatAppearance.BorderSize = 0;
+        btnMarkPaid.Click += BtnMarkPaid_Click;
+
+        pnlFinActions.Controls.AddRange(new Control[] { btnViewInvoice, btnMarkPaid });
+        pnlFinContent.Controls.Add(pnlFinActions);
+
+        // Add in reverse dock order
+        tabFinances.Controls.Add(pnlFinContent);
+        tabFinances.Controls.Add(tblFinKPI);
+        tabFinances.Controls.Add(pnlFinHeader);
     }
 
     private void InitReportsTab()

@@ -105,5 +105,87 @@ public static class SeedData
         order.Lines.Add(new OrderLine { MenuItem = store.MenuItems[10], Quantity = 2 }); // Espresso
         store.Orders.Add(order);
         stay1.RestaurantCharges = order.Total;
+
+        // --- Sample Invoices ---
+
+        // Past guest with completed stay and paid invoice
+        var guest6 = new Guest { Name = "Diana Prince", Contact = "555-0106", IsVip = false, StayCount = 1 };
+        store.Guests.Add(guest6);
+
+        var pastStay = new Stay
+        {
+            Guest = guest6,
+            Room = store.Rooms[5], // 302
+            CheckInDate = DateTime.Today.AddDays(-7),
+            ExpectedCheckOut = DateTime.Today.AddDays(-4),
+            ActualCheckOut = DateTime.Today.AddDays(-4),
+            RoomCharges = 749.97m,
+            Status = StayStatus.CheckedOut
+        };
+        store.Stays.Add(pastStay);
+
+        var pastRes = new Reservation
+        {
+            Guest = guest6,
+            Room = store.Rooms[5],
+            CheckInDate = DateTime.Today.AddDays(-7),
+            CheckOutDate = DateTime.Today.AddDays(-4),
+            Status = ReservationStatus.Completed
+        };
+        store.Reservations.Add(pastRes);
+
+        var invoice1 = new Invoice("INV-1001")
+        {
+            Stay = pastStay,
+            Guest = guest6,
+            Room = store.Rooms[5],
+            InvoiceDate = DateTime.Today.AddDays(-4),
+            PaymentStatus = PaymentStatus.Paid,
+            PaymentMethod = Models.PaymentMethod.CreditCard,
+            PaymentDate = DateTime.Today.AddDays(-4)
+        };
+        for (int i = 0; i < 3; i++)
+        {
+            invoice1.Lines.Add(new InvoiceLine
+            {
+                Description = $"Room 302 - Night {i + 1} ({DateTime.Today.AddDays(-7 + i):MMM dd})",
+                Quantity = 1,
+                UnitPrice = 249.99m,
+                Category = InvoiceLineCategory.RoomCharge
+            });
+        }
+        invoice1.Lines.Add(new InvoiceLine
+        {
+            Description = "Beef Steak",
+            Quantity = 1,
+            UnitPrice = 32.99m,
+            Category = InvoiceLineCategory.RestaurantCharge
+        });
+        invoice1.Lines.Add(new InvoiceLine
+        {
+            Description = "Cappuccino",
+            Quantity = 2,
+            UnitPrice = 4.99m,
+            Category = InvoiceLineCategory.RestaurantCharge
+        });
+        store.Invoices.Add(invoice1);
+
+        // Pending invoice for demonstration (Bob Johnson's upcoming checkout)
+        var invoice2 = new Invoice("INV-1002")
+        {
+            Stay = stay2,
+            Guest = guest4,
+            Room = store.Rooms[4],
+            InvoiceDate = DateTime.Today,
+            PaymentStatus = PaymentStatus.Pending
+        };
+        invoice2.Lines.Add(new InvoiceLine
+        {
+            Description = $"Room 301 - Night 1 ({DateTime.Today.AddDays(-1):MMM dd})",
+            Quantity = 1,
+            UnitPrice = 249.99m,
+            Category = InvoiceLineCategory.RoomCharge
+        });
+        store.Invoices.Add(invoice2);
     }
 }
