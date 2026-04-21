@@ -41,10 +41,14 @@ public partial class MainForm : Form
         // Position logout button
         btnLogout.Location = new Point(panelHeader.Width - btnLogout.Width - 12, 8);
 
-        // Hide Reports tab for non-managers
+        // Hide Reports tab and menu management for non-managers
         if (_authService.CurrentUser != null && !_authService.CurrentUser.IsManager)
         {
             tabMain.TabPages.Remove(tabReports);
+            btnAddMenuItem.Visible = false;
+            btnEditMenuItem.Visible = false;
+            btnToggleAvail.Visible = false;
+            btnRemoveMenuItem.Visible = false;
         }
 
         Load += MainForm_Load;
@@ -783,42 +787,182 @@ public partial class MainForm : Form
 
     // ===================== RESTAURANT =====================
 
+    private List<RestaurantOrder> _filteredOrders = new();
+
     private void RefreshRestaurant()
     {
-        // Menu
-        dgvMenu.Rows.Clear();
-        foreach (var item in _store.MenuItems)
-            dgvMenu.Rows.Add(item.Name, item.Category, $"${item.Price:F2}");
+        RefreshRestKPIs();
+        RefreshCategoryTabs();
+        RefreshMenuGrid();
+        RefreshStayCombos();
+        RefreshOrdersGrid();
+        RefreshOrderDetail();
+    }
 
-        // Stays combo
+    private void RefreshRestKPIs()
+    {
+        var activeCount = _store.Orders.Count(o => o.Status is OrderStatus.Placed or OrderStatus.Preparing);
+        var readyCount = _store.Orders.Count(o => o.Status == OrderStatus.Ready);
+        var todayRev = _restaurantService.GetTodayServedRevenue();
+        var menuCount = _store.MenuItems.Count;
+
+        lblRestKpiActive.Text = activeCount.ToString();
+        lblRestKpiReady.Text = readyCount.ToString();
+        lblRestKpiRevenue.Text = $"${todayRev:F2}";
+        lblRestKpiItems.Text = menuCount.ToString();
+    }
+
+    private void RefreshCategoryTabs()
+    {
+        flpCategoryTabs.Controls.Clear();
+        var categories = new List<string> { "All" };
+        categories.AddRange(_restaurantService.GetCategories());
+
+        foreach (var cat in categories)
+        {
+            var btn = new Button
+            {
+                Text = cat,
+                Font = new Font("Segoe UI", 9, cat == _selectedMenuCategory ? FontStyle.Bold : FontStyle.Regular),
+                BackColor = cat == _selectedMenuCategory ? AppColors.Primary : AppColors.Gray200,
+                ForeColor = cat == _selectedMenuCategory ? Color.White : AppColors.Gray700,
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(Math.Max(70, TextRenderer.MeasureText(cat, new Font("Segoe UI", 9)).Width + 24), 28),
+                Cursor = Cursors.Hand,
+                Margin = new Padding(0, 0, 4, 0),
+                Tag = cat
+            };
+            btn.FlatAppearance.BorderSize = 0;
+            btn.Click += CategoryTab_Click;
+            flpCategoryTabs.Controls.Add(btn);
+        }
+    }
+
+    private void CategoryTab_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not string cat) return;
+        _selectedMenuCategory = cat;
+        RefreshCategoryTabs();
+        RefreshMenuGrid();
+    }
+
+    private void RefreshMenuGrid()
+    {
+        dgvMenu.Rows.Clear();
+        var items = _selectedMenuCategory == "All"
+            ? _store.MenuItems.ToList()
+            : _store.MenuItems.Where(m => m.Category == _selectedMenuCategory).ToList();
+
+        foreach (var item in items)
+            dgvMenu.Rows.Add(item.Name, item.Category, $"${item.Price:F2}", item.IsAvailable ? "Yes" : "No");
+    }
+
+    private void RefreshStayCombos()
+    {
         cmbStay.Items.Clear();
         foreach (var stay in _store.Stays.Where(s => s.Status == StayStatus.Active))
             cmbStay.Items.Add(stay);
         cmbStay.DisplayMember = "DisplayLabel";
         if (cmbStay.Items.Count > 0) cmbStay.SelectedIndex = 0;
 
-        // MenuItem combo
         cmbMenuItem.Items.Clear();
         foreach (var item in _store.MenuItems.Where(m => m.IsAvailable))
             cmbMenuItem.Items.Add(item);
         if (cmbMenuItem.Items.Count > 0) cmbMenuItem.SelectedIndex = 0;
-
-        // Orders
-        RefreshOrdersGrid();
     }
 
     private void RefreshOrdersGrid()
     {
+        var filter = cmbOrderFilter.SelectedItem?.ToString() ?? "All";
+
+        _filteredOrders = filter == "All"
+            ? _store.Orders.ToList()
+            : _store.Orders.Where(o => o.Status.ToString() == filter).ToList();
+
         dgvOrders.Rows.Clear();
-        foreach (var order in _store.Orders.Where(o =>
-            o.Status is not OrderStatus.Cancelled))
+        foreach (var order in _filteredOrders)
         {
             dgvOrders.Rows.Add(
                 order.Stay.Guest.Name,
                 order.Stay.Room.Number,
+                order.ItemCount,
                 $"${order.Total:F2}",
                 order.Status.ToString());
         }
+
+        UpdateRestaurantButtons();
+    }
+
+    private void RefreshOrderDetail()
+    {
+        var order = GetSelectedOrder();
+        if (order == null)
+        {
+            lblOrderDetailGuest.Text = "Select an order to view details";
+            lblOrderDetailStatus.Visible = false;
+            pnlStatusProgression.Visible = false;
+            dgvOrderLines.Visible = false;
+            lblOrderTotal.Visible = false;
+            return;
+        }
+
+        lblOrderDetailGuest.Text = $"{order.Stay.Guest.Name} - Room {order.Stay.Room.Number}";
+
+        lblOrderDetailStatus.Text = order.Status.ToString();
+        lblOrderDetailStatus.BackColor = AppColors.GetOrderStatusColor(order.Status);
+        lblOrderDetailStatus.Visible = true;
+
+        pnlStatusProgression.Tag = order.Status;
+        pnlStatusProgression.Visible = true;
+        pnlStatusProgression.Invalidate();
+
+        dgvOrderLines.Rows.Clear();
+        foreach (var line in order.Lines)
+        {
+            dgvOrderLines.Rows.Add(line.MenuItem.Name, line.Quantity, line.Notes, $"${line.LineTotal:F2}");
+        }
+        dgvOrderLines.Visible = true;
+
+        lblOrderTotal.Text = $"Order Total: ${order.Total:F2}";
+        lblOrderTotal.Visible = true;
+    }
+
+    private void UpdateRestaurantButtons()
+    {
+        var order = GetSelectedOrder();
+        btnAdvanceOrder.Enabled = order != null &&
+            order.Status is OrderStatus.Placed or OrderStatus.Preparing or OrderStatus.Ready;
+        btnAddItemsToOrder.Enabled = order != null &&
+            order.Status is OrderStatus.Placed or OrderStatus.Preparing;
+        btnCancelOrder.Enabled = order != null &&
+            order.Status is OrderStatus.Placed or OrderStatus.Preparing;
+        UpdateAdvanceButtonText();
+    }
+
+    private void UpdateAdvanceButtonText()
+    {
+        var order = GetSelectedOrder();
+        if (order == null)
+        {
+            btnAdvanceOrder.Text = "Advance Status";
+            return;
+        }
+
+        btnAdvanceOrder.Text = order.Status switch
+        {
+            OrderStatus.Placed => "Mark Preparing",
+            OrderStatus.Preparing => "Mark Ready",
+            OrderStatus.Ready => "Mark Served",
+            _ => "Advance Status"
+        };
+    }
+
+    private void CmbOrderFilter_Changed(object? sender, EventArgs e) => RefreshOrdersGrid();
+
+    private void DgvOrders_SelectionChanged(object? sender, EventArgs e)
+    {
+        RefreshOrderDetail();
+        UpdateRestaurantButtons();
     }
 
     private void BtnAddLine_Click(object? sender, EventArgs e)
@@ -828,11 +972,37 @@ public partial class MainForm : Form
         var line = new OrderLine
         {
             MenuItem = menuItem,
-            Quantity = (int)nudQty.Value
+            Quantity = (int)nudQty.Value,
+            Notes = txtLineNotes.Text.Trim()
         };
         _currentOrderLines.Add(line);
-        lstOrderLines.Items.Add(line.ToString());
+        dgvCurrentOrderLines.Rows.Add(line.MenuItem.Name, line.Quantity, line.Notes, $"${line.LineTotal:F2}");
         nudQty.Value = 1;
+        txtLineNotes.Clear();
+        UpdateRunningTotal();
+    }
+
+    private void DgvCurrentOrderLines_CellClick(object? sender, DataGridViewCellEventArgs e)
+    {
+        if (e.ColumnIndex == dgvCurrentOrderLines.Columns["Remove"]!.Index && e.RowIndex >= 0)
+        {
+            _currentOrderLines.RemoveAt(e.RowIndex);
+            dgvCurrentOrderLines.Rows.RemoveAt(e.RowIndex);
+            UpdateRunningTotal();
+        }
+    }
+
+    private void BtnClearOrder_Click(object? sender, EventArgs e)
+    {
+        _currentOrderLines.Clear();
+        dgvCurrentOrderLines.Rows.Clear();
+        UpdateRunningTotal();
+    }
+
+    private void UpdateRunningTotal()
+    {
+        var total = _currentOrderLines.Sum(l => l.LineTotal);
+        lblRunningTotal.Text = $"Total: ${total:F2}";
     }
 
     private void BtnPlaceOrder_Click(object? sender, EventArgs e)
@@ -858,7 +1028,9 @@ public partial class MainForm : Form
             MessageBoxButtons.OK, MessageBoxIcon.Information);
 
         _currentOrderLines.Clear();
-        lstOrderLines.Items.Clear();
+        dgvCurrentOrderLines.Rows.Clear();
+        UpdateRunningTotal();
+        RefreshRestKPIs();
         RefreshOrdersGrid();
     }
 
@@ -866,10 +1038,7 @@ public partial class MainForm : Form
     {
         if (dgvOrders.CurrentRow == null) return null;
         var idx = dgvOrders.CurrentRow.Index;
-        var visibleOrders = _store.Orders
-            .Where(o => o.Status is not OrderStatus.Cancelled)
-            .ToList();
-        return idx >= 0 && idx < visibleOrders.Count ? visibleOrders[idx] : null;
+        return idx >= 0 && idx < _filteredOrders.Count ? _filteredOrders[idx] : null;
     }
 
     private void BtnAdvanceOrder_Click(object? sender, EventArgs e)
@@ -878,7 +1047,9 @@ public partial class MainForm : Form
         if (order == null) return;
 
         _restaurantService.AdvanceOrderStatus(order);
+        RefreshRestKPIs();
         RefreshOrdersGrid();
+        RefreshOrderDetail();
     }
 
     private void BtnCancelOrder_Click(object? sender, EventArgs e)
@@ -890,7 +1061,344 @@ public partial class MainForm : Form
             MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
         {
             _restaurantService.CancelOrder(order);
+            RefreshRestKPIs();
             RefreshOrdersGrid();
+            RefreshOrderDetail();
+        }
+    }
+
+    private void BtnAddItemsToOrder_Click(object? sender, EventArgs e)
+    {
+        var order = GetSelectedOrder();
+        if (order == null || order.Status is not (OrderStatus.Placed or OrderStatus.Preparing)) return;
+
+        using var dlg = new Form
+        {
+            Text = $"Add Items to Order - {order.Stay.Guest.Name}",
+            Size = new Size(450, 400),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = AppColors.Surface
+        };
+
+        var cmbDlgItem = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(20, 20),
+            Size = new Size(200, 28)
+        };
+        foreach (var item in _store.MenuItems.Where(m => m.IsAvailable))
+            cmbDlgItem.Items.Add(item);
+        if (cmbDlgItem.Items.Count > 0) cmbDlgItem.SelectedIndex = 0;
+
+        var nudDlgQty = new NumericUpDown
+        {
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(230, 20),
+            Size = new Size(55, 28),
+            Minimum = 1, Maximum = 20, Value = 1
+        };
+
+        var txtDlgNotes = new TextBox
+        {
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(295, 20),
+            Size = new Size(120, 28),
+            PlaceholderText = "Notes"
+        };
+
+        var dlgLines = new BindingList<OrderLine>();
+        var dgvDlgLines = new DataGridView
+        {
+            Location = new Point(20, 90),
+            Size = new Size(395, 180),
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            RowHeadersVisible = false,
+            Font = new Font("Segoe UI", 9)
+        };
+        dgvDlgLines.Columns.Add("Item", "Item");
+        dgvDlgLines.Columns.Add("Qty", "Qty");
+        dgvDlgLines.Columns["Qty"]!.Width = 40;
+        dgvDlgLines.Columns.Add("Notes", "Notes");
+        dgvDlgLines.Columns.Add("Total", "Total");
+        dgvDlgLines.Columns["Total"]!.Width = 70;
+
+        var btnDlgAdd = new Button
+        {
+            Text = "Add",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(60, 28),
+            Location = new Point(20, 56),
+            Cursor = Cursors.Hand
+        };
+        btnDlgAdd.FlatAppearance.BorderSize = 0;
+        btnDlgAdd.Click += (s2, e2) =>
+        {
+            if (cmbDlgItem.SelectedItem is not Models.MenuItem mi) return;
+            var line = new OrderLine { MenuItem = mi, Quantity = (int)nudDlgQty.Value, Notes = txtDlgNotes.Text.Trim() };
+            dlgLines.Add(line);
+            dgvDlgLines.Rows.Add(mi.Name, line.Quantity, line.Notes, $"${line.LineTotal:F2}");
+            nudDlgQty.Value = 1;
+            txtDlgNotes.Clear();
+        };
+
+        var btnDlgConfirm = new Button
+        {
+            Text = "Add to Order",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(140, 36),
+            Location = new Point(20, 280),
+            DialogResult = DialogResult.OK,
+            Cursor = Cursors.Hand
+        };
+        btnDlgConfirm.FlatAppearance.BorderSize = 0;
+
+        dlg.Controls.AddRange(new Control[] { cmbDlgItem, nudDlgQty, txtDlgNotes, btnDlgAdd, dgvDlgLines, btnDlgConfirm });
+        dlg.AcceptButton = btnDlgConfirm;
+
+        if (dlg.ShowDialog(this) == DialogResult.OK && dlgLines.Count > 0)
+        {
+            _restaurantService.AddLinesToOrder(order, dlgLines);
+            RefreshRestKPIs();
+            RefreshOrdersGrid();
+            RefreshOrderDetail();
+        }
+    }
+
+    // --- Menu Management ---
+
+    private Models.MenuItem? GetSelectedMenuItem()
+    {
+        if (dgvMenu.CurrentRow == null) return null;
+        var idx = dgvMenu.CurrentRow.Index;
+        var items = _selectedMenuCategory == "All"
+            ? _store.MenuItems.ToList()
+            : _store.MenuItems.Where(m => m.Category == _selectedMenuCategory).ToList();
+        return idx >= 0 && idx < items.Count ? items[idx] : null;
+    }
+
+    private void ShowMenuItemDialog(Models.MenuItem? existing)
+    {
+        using var dlg = new Form
+        {
+            Text = existing == null ? "Add Menu Item" : "Edit Menu Item",
+            Size = new Size(340, 280),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = AppColors.Surface
+        };
+
+        var lblN = new Label { Text = "Name:", Font = new Font("Segoe UI", 10), Location = new Point(20, 20), AutoSize = true };
+        var txtName = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(100, 17), Size = new Size(200, 28), Text = existing?.Name ?? "" };
+
+        var lblP = new Label { Text = "Price:", Font = new Font("Segoe UI", 10), Location = new Point(20, 55), AutoSize = true };
+        var txtPrice = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(100, 52), Size = new Size(100, 28), Text = existing?.Price.ToString("F2") ?? "0.00" };
+
+        var lblC = new Label { Text = "Category:", Font = new Font("Segoe UI", 10), Location = new Point(20, 90), AutoSize = true };
+        var cmbCat = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(100, 87),
+            Size = new Size(200, 28)
+        };
+        foreach (var cat in _restaurantService.GetCategories())
+            cmbCat.Items.Add(cat);
+        cmbCat.Text = existing?.Category ?? "";
+
+        var chkAvail = new CheckBox
+        {
+            Text = "Available",
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(100, 122),
+            AutoSize = true,
+            Checked = existing?.IsAvailable ?? true
+        };
+
+        var btnOk = new Button
+        {
+            Text = existing == null ? "Add" : "Save",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(100, 34),
+            Location = new Point(100, 160),
+            DialogResult = DialogResult.OK,
+            Cursor = Cursors.Hand
+        };
+        btnOk.FlatAppearance.BorderSize = 0;
+
+        var btnCancel = new Button
+        {
+            Text = "Cancel",
+            Font = new Font("Segoe UI", 10),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(80, 34),
+            Location = new Point(210, 160),
+            DialogResult = DialogResult.Cancel,
+            Cursor = Cursors.Hand
+        };
+
+        dlg.Controls.AddRange(new Control[] { lblN, txtName, lblP, txtPrice, lblC, cmbCat, chkAvail, btnOk, btnCancel });
+        dlg.AcceptButton = btnOk;
+        dlg.CancelButton = btnCancel;
+
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            var name = txtName.Text.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                MessageBox.Show("Name is required.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            if (!decimal.TryParse(txtPrice.Text, out var price) || price < 0)
+            {
+                MessageBox.Show("Enter a valid price.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            var category = cmbCat.Text.Trim();
+            if (string.IsNullOrEmpty(category)) category = "Uncategorized";
+
+            if (existing == null)
+            {
+                _restaurantService.AddMenuItem(new Models.MenuItem
+                {
+                    Name = name,
+                    Price = price,
+                    Category = category,
+                    IsAvailable = chkAvail.Checked
+                });
+            }
+            else
+            {
+                _restaurantService.UpdateMenuItem(existing, name, price, category, chkAvail.Checked);
+            }
+
+            RefreshCategoryTabs();
+            RefreshMenuGrid();
+            RefreshStayCombos();
+            RefreshRestKPIs();
+        }
+    }
+
+    private void BtnAddMenuItem_Click(object? sender, EventArgs e) => ShowMenuItemDialog(null);
+
+    private void BtnEditMenuItem_Click(object? sender, EventArgs e)
+    {
+        var item = GetSelectedMenuItem();
+        if (item == null)
+        {
+            MessageBox.Show("Select a menu item first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        ShowMenuItemDialog(item);
+    }
+
+    private void BtnToggleAvail_Click(object? sender, EventArgs e)
+    {
+        var item = GetSelectedMenuItem();
+        if (item == null) return;
+        _restaurantService.ToggleAvailability(item);
+        RefreshMenuGrid();
+        RefreshStayCombos();
+        RefreshRestKPIs();
+    }
+
+    private void BtnRemoveMenuItem_Click(object? sender, EventArgs e)
+    {
+        var item = GetSelectedMenuItem();
+        if (item == null) return;
+        if (MessageBox.Show($"Remove '{item.Name}' from the menu?", "Confirm",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+        {
+            _restaurantService.RemoveMenuItem(item);
+            RefreshCategoryTabs();
+            RefreshMenuGrid();
+            RefreshStayCombos();
+            RefreshRestKPIs();
+        }
+    }
+
+    // --- Status Progression Painter ---
+
+    private void PaintStatusProgression(object? sender, PaintEventArgs e)
+    {
+        if (sender is not Panel pnl) return;
+        var status = pnl.Tag is OrderStatus os ? os : OrderStatus.Placed;
+
+        var g = e.Graphics;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        var statuses = new[] { OrderStatus.Placed, OrderStatus.Preparing, OrderStatus.Ready, OrderStatus.Served };
+        var labels = new[] { "Placed", "Preparing", "Ready", "Served" };
+        var circleSize = 18;
+        var spacing = (pnl.Width - 40) / (statuses.Length - 1);
+        var y = pnl.Height / 2;
+
+        var currentIdx = Array.IndexOf(statuses, status);
+        if (status == OrderStatus.Cancelled) currentIdx = -1;
+
+        for (int i = 0; i < statuses.Length; i++)
+        {
+            var cx = 20 + i * spacing;
+
+            // Draw connecting line
+            if (i > 0)
+            {
+                var prevX = 20 + (i - 1) * spacing;
+                var lineColor = i <= currentIdx ? AppColors.Tertiary : AppColors.Gray300;
+                using var pen = new Pen(lineColor, 2);
+                g.DrawLine(pen, prevX + circleSize / 2, y, cx - circleSize / 2, y);
+            }
+
+            // Draw circle
+            var filled = i <= currentIdx;
+            var circleRect = new Rectangle(cx - circleSize / 2, y - circleSize / 2, circleSize, circleSize);
+            if (filled)
+            {
+                using var brush = new SolidBrush(AppColors.Tertiary);
+                g.FillEllipse(brush, circleRect);
+                // Checkmark for completed stages
+                if (i < currentIdx)
+                {
+                    using var checkPen = new Pen(Color.White, 2);
+                    g.DrawLine(checkPen, cx - 4, y, cx - 1, y + 3);
+                    g.DrawLine(checkPen, cx - 1, y + 3, cx + 5, y - 4);
+                }
+                else
+                {
+                    // Current stage - filled dot
+                    using var dotBrush = new SolidBrush(Color.White);
+                    g.FillEllipse(dotBrush, cx - 3, y - 3, 6, 6);
+                }
+            }
+            else
+            {
+                using var pen = new Pen(AppColors.Gray300, 2);
+                g.DrawEllipse(pen, circleRect);
+            }
+
+            // Label
+            var labelColor = i <= currentIdx ? AppColors.Primary : AppColors.Gray400;
+            TextRenderer.DrawText(g, labels[i], new Font("Segoe UI", 7),
+                new Point(cx - 20, y + circleSize / 2 + 2), labelColor);
         }
     }
 

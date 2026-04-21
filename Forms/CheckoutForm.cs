@@ -216,6 +216,7 @@ public class CheckoutForm : Form
             var btnConfirm = new Button
             {
                 Text = "Confirm Checkout && Pay",
+                UseMnemonic = false,
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 BackColor = AppColors.Accent,
                 ForeColor = AppColors.Primary,
