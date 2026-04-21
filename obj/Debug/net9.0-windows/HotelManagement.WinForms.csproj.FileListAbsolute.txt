@@ -1,0 +1,14 @@
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/bin/Debug/net9.0-windows/HotelManagement.WinForms
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/bin/Debug/net9.0-windows/HotelManagement.WinForms.deps.json
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/bin/Debug/net9.0-windows/HotelManagement.WinForms.runtimeconfig.json
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/bin/Debug/net9.0-windows/HotelManagement.WinForms.dll
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/bin/Debug/net9.0-windows/HotelManagement.WinForms.pdb
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/HotelManagement.WinForms.GeneratedMSBuildEditorConfig.editorconfig
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/HotelManagement.WinForms.AssemblyInfoInputs.cache
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/HotelManagement.WinForms.AssemblyInfo.cs
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/HotelManagement.WinForms.csproj.CoreCompileInputs.cache
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/HotelManagement.WinForms.dll
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/refint/HotelManagement.WinForms.dll
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/HotelManagement.WinForms.pdb
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/HotelManagement.WinForms.genruntimeconfig.cache
+/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/Debug/net9.0-windows/ref/HotelManagement.WinForms.dll
