@@ -8,29 +8,31 @@
     "net9.0-windows7.0": []
   },
   "packageFolders": {
-    "/Users/AbdurahmanIbrahem/.nuget/packages/": {}
+    "C:\\Users\\lenovo\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/HotelManagement.WinForms.csproj",
+      "projectUniqueName": "C:\\Users\\lenovo\\Windows-school\\HotelManagement.WinForms.csproj",
       "projectName": "HotelManagement.WinForms",
-      "projectPath": "/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/HotelManagement.WinForms.csproj",
-      "packagesPath": "/Users/AbdurahmanIbrahem/.nuget/packages/",
-      "outputPath": "/Users/AbdurahmanIbrahem/Desktop/School/HotelManagement/Windows/obj/",
+      "projectPath": "C:\\Users\\lenovo\\Windows-school\\HotelManagement.WinForms.csproj",
+      "packagesPath": "C:\\Users\\lenovo\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\lenovo\\Windows-school\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/Users/AbdurahmanIbrahem/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\lenovo\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
         "net9.0-windows"
       ],
       "sources": {
-        "/usr/local/share/dotnet/library-packs": {},
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
         "net9.0-windows7.0": {
+          "framework": "net9.0-windows7.0",
           "targetAlias": "net9.0-windows",
           "projectReferences": {}
         }
@@ -45,10 +47,11 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.200"
     },
     "frameworks": {
       "net9.0-windows7.0": {
+        "framework": "net9.0-windows7.0",
         "targetAlias": "net9.0-windows",
         "imports": [
           "net461",
@@ -63,8 +66,20 @@
         "warn": true,
         "downloadDependencies": [
           {
+            "name": "Microsoft.AspNetCore.App.Ref",
+            "version": "[9.0.15, 9.0.15]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Host.win-x64",
+            "version": "[9.0.15, 9.0.15]"
+          },
+          {
+            "name": "Microsoft.NETCore.App.Ref",
+            "version": "[9.0.15, 9.0.15]"
+          },
+          {
             "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[9.0.8, 9.0.8]"
+            "version": "[9.0.15, 9.0.15]"
           }
         ],
         "frameworkReferences": {
@@ -75,7 +90,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "/usr/local/share/dotnet/sdk/9.0.304/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.202/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
