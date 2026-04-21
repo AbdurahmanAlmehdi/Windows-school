@@ -26,9 +26,9 @@ partial class LoginForm
         // Form settings
         Text = "The Grand Hotel - Login";
         Size = new Size(800, 500);
+        MinimumSize = new Size(650, 420);
         StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
         BackColor = AppColors.Surface;
 
         // Left decorative panel
@@ -46,7 +46,6 @@ partial class LoginForm
             ForeColor = AppColors.Accent,
             AutoSize = false,
             Size = new Size(280, 140),
-            Location = new Point(20, 120),
             TextAlign = ContentAlignment.MiddleCenter
         };
 
@@ -57,20 +56,42 @@ partial class LoginForm
             ForeColor = Color.FromArgb(180, 255, 255, 255),
             AutoSize = false,
             Size = new Size(280, 30),
-            Location = new Point(20, 265),
             TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        panelLeft.Resize += (s, e) =>
+        {
+            lblHotelName.Location = new Point(
+                (panelLeft.Width - lblHotelName.Width) / 2,
+                (panelLeft.Height - 170) / 2);
+            lblTagline.Location = new Point(
+                (panelLeft.Width - lblTagline.Width) / 2,
+                lblHotelName.Bottom + 5);
         };
 
         panelLeft.Controls.Add(lblHotelName);
         panelLeft.Controls.Add(lblTagline);
 
-        // Right login panel
+        // Right panel (fills remaining space)
+        var panelRight = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = AppColors.Surface
+        };
+
+        // Fixed-size login panel, centered inside panelRight
+        var panelLogin = new Panel
+        {
+            Size = new Size(340, 350),
+            BackColor = AppColors.Surface
+        };
+
         var lblTitle = new Label
         {
             Text = "Sign In",
             Font = new Font("Segoe UI", 22, FontStyle.Bold),
             ForeColor = AppColors.Primary,
-            Location = new Point(380, 80),
+            Location = new Point(0, 0),
             AutoSize = true
         };
 
@@ -79,7 +100,7 @@ partial class LoginForm
             Text = "Enter your credentials to continue",
             Font = new Font("Segoe UI", 10),
             ForeColor = AppColors.Gray500,
-            Location = new Point(380, 120),
+            Location = new Point(0, 48),
             AutoSize = true
         };
 
@@ -88,14 +109,14 @@ partial class LoginForm
             Text = "Username",
             Font = new Font("Segoe UI", 10, FontStyle.Bold),
             ForeColor = AppColors.Gray700,
-            Location = new Point(380, 175),
+            Location = new Point(0, 95),
             AutoSize = true
         };
 
         txtUsername = new TextBox
         {
             Font = new Font("Segoe UI", 12),
-            Location = new Point(380, 200),
+            Location = new Point(0, 120),
             Size = new Size(340, 30),
             PlaceholderText = "Enter username"
         };
@@ -105,14 +126,14 @@ partial class LoginForm
             Text = "Password",
             Font = new Font("Segoe UI", 10, FontStyle.Bold),
             ForeColor = AppColors.Gray700,
-            Location = new Point(380, 250),
+            Location = new Point(0, 170),
             AutoSize = true
         };
 
         txtPassword = new TextBox
         {
             Font = new Font("Segoe UI", 12),
-            Location = new Point(380, 275),
+            Location = new Point(0, 195),
             Size = new Size(340, 30),
             UseSystemPasswordChar = true,
             PlaceholderText = "Enter password"
@@ -124,7 +145,7 @@ partial class LoginForm
             Text = "",
             Font = new Font("Segoe UI", 9),
             ForeColor = Color.FromArgb(200, 50, 50),
-            Location = new Point(380, 315),
+            Location = new Point(0, 235),
             AutoSize = true,
             Visible = false
         };
@@ -137,7 +158,7 @@ partial class LoginForm
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(340, 45),
-            Location = new Point(380, 345),
+            Location = new Point(0, 265),
             Cursor = Cursors.Hand
         };
         btnSignIn.FlatAppearance.BorderSize = 0;
@@ -148,20 +169,27 @@ partial class LoginForm
             Text = "Hint: admin / admin123  or  staff / staff123",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Gray400,
-            Location = new Point(380, 405),
+            Location = new Point(0, 320),
             AutoSize = true
         };
 
+        panelLogin.Controls.AddRange(new Control[] {
+            lblTitle, lblSubtitle, lblUser, txtUsername,
+            lblPass, txtPassword, lblError, btnSignIn, lblHint
+        });
+
+        // Center the login panel inside the right panel on resize
+        panelRight.Resize += (s, e) =>
+        {
+            panelLogin.Location = new Point(
+                Math.Max(20, (panelRight.Width - panelLogin.Width) / 2),
+                Math.Max(20, (panelRight.Height - panelLogin.Height) / 2));
+        };
+
+        panelRight.Controls.Add(panelLogin);
+
+        Controls.Add(panelRight);
         Controls.Add(panelLeft);
-        Controls.Add(lblTitle);
-        Controls.Add(lblSubtitle);
-        Controls.Add(lblUser);
-        Controls.Add(txtUsername);
-        Controls.Add(lblPass);
-        Controls.Add(txtPassword);
-        Controls.Add(lblError);
-        Controls.Add(btnSignIn);
-        Controls.Add(lblHint);
 
         AcceptButton = btnSignIn;
 

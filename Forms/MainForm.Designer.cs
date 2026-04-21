@@ -219,29 +219,39 @@ partial class MainForm
             Font = new Font("Segoe UI", 18, FontStyle.Bold),
             ForeColor = AppColors.Primary,
             AutoSize = true,
-            Location = new Point(0, 0)
+            Dock = DockStyle.Top
         };
         tabDashboard.Controls.Add(lblDashTitle);
 
+        var flpDashboard = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            Padding = new Padding(0, 10, 0, 0),
+            WrapContents = true,
+            BackColor = AppColors.Surface
+        };
+
         pnlOccupancy = CreateMetricCard("Occupancy Rate", AppColors.Primary, out lblOccupancyValue, out lblOccupancyTitle, new Size(540, 100));
-        pnlOccupancy.Location = new Point(0, 50);
-        tabDashboard.Controls.Add(pnlOccupancy);
+        pnlOccupancy.Margin = new Padding(0, 0, 10, 10);
 
         pnlArrivals = CreateMetricCard("Arrivals Today", AppColors.Tertiary, out lblArrivalsValue, out lblArrivalsTitle, new Size(260, 100));
-        pnlArrivals.Location = new Point(0, 165);
-        tabDashboard.Controls.Add(pnlArrivals);
+        pnlArrivals.Margin = new Padding(0, 0, 10, 10);
 
         pnlDepartures = CreateMetricCard("Departures Today", AppColors.Primary, out lblDeparturesValue, out lblDeparturesTitle, new Size(260, 100));
-        pnlDepartures.Location = new Point(280, 165);
-        tabDashboard.Controls.Add(pnlDepartures);
+        pnlDepartures.Margin = new Padding(0, 0, 10, 10);
 
         pnlHousekeeping = CreateMetricCard("Needs Cleaning", AppColors.StatusClean, out lblHousekeepingValue, out lblHousekeepingTitle, new Size(260, 100));
-        pnlHousekeeping.Location = new Point(0, 280);
-        tabDashboard.Controls.Add(pnlHousekeeping);
+        pnlHousekeeping.Margin = new Padding(0, 0, 10, 10);
 
         pnlActiveOrders = CreateMetricCard("Active Orders", AppColors.Tertiary, out lblActiveOrdersValue, out lblActiveOrdersTitle, new Size(260, 100));
-        pnlActiveOrders.Location = new Point(280, 280);
-        tabDashboard.Controls.Add(pnlActiveOrders);
+        pnlActiveOrders.Margin = new Padding(0, 0, 10, 10);
+
+        flpDashboard.Controls.AddRange(new Control[] {
+            pnlOccupancy, pnlArrivals, pnlDepartures, pnlHousekeeping, pnlActiveOrders
+        });
+
+        tabDashboard.Controls.Add(flpDashboard);
     }
 
     private void InitReservationsTab()
@@ -293,7 +303,7 @@ partial class MainForm
         {
             Location = new Point(0, 75),
             Size = new Size(700, 300),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
@@ -327,6 +337,7 @@ partial class MainForm
             FlatStyle = FlatStyle.Flat,
             Size = new Size(110, 36),
             Location = new Point(0, 385),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
             Enabled = false,
             Cursor = Cursors.Hand
         };
@@ -343,6 +354,7 @@ partial class MainForm
             FlatStyle = FlatStyle.Flat,
             Size = new Size(110, 36),
             Location = new Point(120, 385),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
             Enabled = false,
             Cursor = Cursors.Hand
         };
@@ -359,6 +371,7 @@ partial class MainForm
             FlatStyle = FlatStyle.Flat,
             Size = new Size(110, 36),
             Location = new Point(240, 385),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left,
             Enabled = false,
             Cursor = Cursors.Hand
         };
@@ -374,7 +387,7 @@ partial class MainForm
             ForeColor = AppColors.Primary,
             Location = new Point(0, 435),
             Size = new Size(700, 220),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
         };
 
         var lblPhone = new Label { Text = "Phone:", Font = new Font("Segoe UI", 10), Location = new Point(12, 30), AutoSize = true };
@@ -686,6 +699,13 @@ partial class MainForm
 
     private void InitReportsTab()
     {
+        var pnlRepHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 80,
+            BackColor = AppColors.Surface
+        };
+
         var lblRepTitle = new Label
         {
             Text = "Reports & Analytics",
@@ -694,7 +714,7 @@ partial class MainForm
             AutoSize = true,
             Location = new Point(0, 0)
         };
-        tabReports.Controls.Add(lblRepTitle);
+        pnlRepHeader.Controls.Add(lblRepTitle);
 
         btnRefreshReports = new Button
         {
@@ -709,25 +729,33 @@ partial class MainForm
         };
         btnRefreshReports.FlatAppearance.BorderSize = 0;
         btnRefreshReports.Click += BtnRefreshReports_Click;
-        tabReports.Controls.Add(btnRefreshReports);
+        pnlRepHeader.Controls.Add(btnRefreshReports);
+
+        tabReports.Controls.Add(pnlRepHeader);
+
+        // Scrollable content area
+        var flpReports = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            WrapContents = true,
+            Padding = new Padding(0, 5, 0, 0),
+            BackColor = AppColors.Surface
+        };
 
         // KPI panels
         pnlOccReport = CreateMetricCard("Occupancy Rate", AppColors.Primary, out lblOccReportValue, out _, new Size(200, 90));
-        pnlOccReport.Location = new Point(0, 85);
-        tabReports.Controls.Add(pnlOccReport);
+        pnlOccReport.Margin = new Padding(0, 0, 10, 10);
 
         pnlAvgStay = CreateMetricCard("Avg Stay Duration", AppColors.Tertiary, out lblAvgStayValue, out _, new Size(200, 90));
-        pnlAvgStay.Location = new Point(210, 85);
-        tabReports.Controls.Add(pnlAvgStay);
+        pnlAvgStay.Margin = new Padding(0, 0, 10, 10);
 
         pnlRepeatGuest = CreateMetricCard("Repeat Guests", AppColors.StatusClean, out lblRepeatGuestValue, out _, new Size(200, 90));
-        pnlRepeatGuest.Location = new Point(420, 85);
-        tabReports.Controls.Add(pnlRepeatGuest);
+        pnlRepeatGuest.Margin = new Padding(0, 0, 10, 10);
 
         pnlTotalRevenue = CreateMetricCard("Total Revenue", AppColors.Accent, out lblTotalRevenueValue, out _, new Size(200, 90));
         lblTotalRevenueValue.ForeColor = AppColors.Primary;
-        pnlTotalRevenue.Location = new Point(630, 85);
-        tabReports.Controls.Add(pnlTotalRevenue);
+        pnlTotalRevenue.Margin = new Padding(0, 0, 10, 10);
 
         // GroupBoxes
         grpRevRoom = new GroupBox
@@ -735,35 +763,39 @@ partial class MainForm
             Text = "Revenue by Room Type",
             Font = new Font("Segoe UI", 11, FontStyle.Bold),
             ForeColor = AppColors.Primary,
-            Location = new Point(0, 190),
-            Size = new Size(280, 200)
+            Size = new Size(280, 200),
+            Margin = new Padding(0, 0, 10, 10)
         };
         lblRevRoom = new Label { Font = new Font("Segoe UI", 10), ForeColor = AppColors.Gray700, Location = new Point(12, 28), AutoSize = true };
         grpRevRoom.Controls.Add(lblRevRoom);
-        tabReports.Controls.Add(grpRevRoom);
 
         grpRevRestaurant = new GroupBox
         {
             Text = "Restaurant Revenue by Category",
             Font = new Font("Segoe UI", 11, FontStyle.Bold),
             ForeColor = AppColors.Primary,
-            Location = new Point(300, 190),
-            Size = new Size(280, 200)
+            Size = new Size(280, 200),
+            Margin = new Padding(0, 0, 10, 10)
         };
         lblRevRestaurant = new Label { Font = new Font("Segoe UI", 10), ForeColor = AppColors.Gray700, Location = new Point(12, 28), AutoSize = true };
         grpRevRestaurant.Controls.Add(lblRevRestaurant);
-        tabReports.Controls.Add(grpRevRestaurant);
 
         grpTopItems = new GroupBox
         {
             Text = "Top Menu Items",
             Font = new Font("Segoe UI", 11, FontStyle.Bold),
             ForeColor = AppColors.Primary,
-            Location = new Point(600, 190),
-            Size = new Size(280, 200)
+            Size = new Size(280, 200),
+            Margin = new Padding(0, 0, 10, 10)
         };
         lblTopItems = new Label { Font = new Font("Segoe UI", 10), ForeColor = AppColors.Gray700, Location = new Point(12, 28), AutoSize = true };
         grpTopItems.Controls.Add(lblTopItems);
-        tabReports.Controls.Add(grpTopItems);
+
+        flpReports.Controls.AddRange(new Control[] {
+            pnlOccReport, pnlAvgStay, pnlRepeatGuest, pnlTotalRevenue,
+            grpRevRoom, grpRevRestaurant, grpTopItems
+        });
+
+        tabReports.Controls.Add(flpReports);
     }
 }
