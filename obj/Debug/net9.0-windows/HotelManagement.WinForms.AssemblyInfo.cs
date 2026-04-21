@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("HotelManagement.WinForms")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a456fe23294f011ebe77e1dde93e569ce5bc0c12")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+b8d9a7822c83bdd511ae0b9e22a084588b22c324")]
 [assembly: System.Reflection.AssemblyProductAttribute("HotelManagement.WinForms")]
 [assembly: System.Reflection.AssemblyTitleAttribute("HotelManagement.WinForms")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
