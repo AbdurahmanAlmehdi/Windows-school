@@ -9,6 +9,9 @@ public static class AppColors
     public static readonly Color StatusOOS = ColorTranslator.FromHtml("#8B3A3A");
     public static readonly Color StatusClean = ColorTranslator.FromHtml("#C4722A");
 
+    public static readonly Color ShadowColor = Color.FromArgb(15, 0, 0, 0);
+    public static readonly Color CardBackground = Color.White;
+
     public static readonly Color Gray100 = ColorTranslator.FromHtml("#F5F5F5");
     public static readonly Color Gray200 = ColorTranslator.FromHtml("#E5E5E5");
     public static readonly Color Gray300 = ColorTranslator.FromHtml("#D4D4D4");
@@ -26,6 +29,16 @@ public static class AppColors
         Models.RoomStatus.Occupied => Primary,
         Models.RoomStatus.NeedsCleaning => StatusClean,
         Models.RoomStatus.OutOfService => StatusOOS,
+        _ => Gray500
+    };
+
+    public static Color GetOrderStatusColor(Models.OrderStatus status) => status switch
+    {
+        Models.OrderStatus.Placed => Accent,
+        Models.OrderStatus.Preparing => StatusClean,
+        Models.OrderStatus.Ready => Tertiary,
+        Models.OrderStatus.Served => Gray400,
+        Models.OrderStatus.Cancelled => StatusOOS,
         _ => Gray500
     };
 }

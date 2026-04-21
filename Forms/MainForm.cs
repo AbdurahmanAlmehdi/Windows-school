@@ -74,25 +74,393 @@ public partial class MainForm : Form
 
     private void RefreshDashboard()
     {
-        lblOccupancyValue.Text = $"{_reportService.GetOccupancyRate():F1}%";
+        UpdateWelcomeBar();
+        UpdateKPICards();
+        RefreshArrivalsPanel();
+        RefreshDeparturesPanel();
+        RefreshHousekeepingPanel();
+        RefreshActiveOrdersPanel();
+    }
 
+    private void UpdateWelcomeBar()
+    {
+        var hour = DateTime.Now.Hour;
+        var greeting = hour switch
+        {
+            < 12 => "Good morning",
+            < 17 => "Good afternoon",
+            _ => "Good evening"
+        };
+        var username = _authService.CurrentUser?.Username ?? "user";
+        lblGreeting.Text = $"{greeting}, {username}";
+        lblDate.Text = DateTime.Today.ToString("dddd, MMM dd, yyyy");
+    }
+
+    private void UpdateKPICards()
+    {
+        var occupancyRate = _reportService.GetOccupancyRate();
+        lblOccupancyValue.Text = $"{occupancyRate:F1}%";
+
+        var available = _store.Rooms.Count(r => r.Status == RoomStatus.Available);
+        lblAvailableValue.Text = available.ToString();
+
+        var occupied = _store.Rooms.Count(r => r.Status == RoomStatus.Occupied);
+        lblOccupiedValue.Text = occupied.ToString();
+
+        var oos = _store.Rooms.Count(r => r.Status == RoomStatus.OutOfService);
+        lblOOSValue.Text = oos.ToString();
+
+        pnlOccupancy.Invalidate();
+    }
+
+    private void RefreshArrivalsPanel()
+    {
+        flpArrivals.Controls.Clear();
         var today = DateTime.Today;
-        var arrivals = _store.Reservations.Count(r =>
-            r.CheckInDate.Date == today &&
-            r.Status == ReservationStatus.Confirmed);
-        lblArrivalsValue.Text = arrivals.ToString();
+        var arrivals = _store.Reservations
+            .Where(r => r.CheckInDate.Date == today && r.Status == ReservationStatus.Confirmed)
+            .ToList();
 
-        var departures = _store.Stays.Count(s =>
-            s.ExpectedCheckOut.Date == today &&
-            s.Status == StayStatus.Active);
-        lblDeparturesValue.Text = departures.ToString();
+        UpdateCardBadge(pnlArrivalsCard, arrivals.Count);
+        lblArrivalsHeader.Text = $"Arrivals Today";
 
-        var cleaning = _store.Rooms.Count(r => r.Status == RoomStatus.NeedsCleaning);
-        lblHousekeepingValue.Text = cleaning.ToString();
+        if (arrivals.Count == 0)
+        {
+            flpArrivals.Controls.Add(CreateEmptyState("No arrivals today"));
+            return;
+        }
 
-        var activeOrders = _store.Orders.Count(o =>
-            o.Status is OrderStatus.Placed or OrderStatus.Preparing or OrderStatus.Ready);
-        lblActiveOrdersValue.Text = activeOrders.ToString();
+        foreach (var res in arrivals)
+            flpArrivals.Controls.Add(CreateArrivalRow(res));
+    }
+
+    private void RefreshDeparturesPanel()
+    {
+        flpDepartures.Controls.Clear();
+        var today = DateTime.Today;
+        var departures = _store.Stays
+            .Where(s => s.ExpectedCheckOut.Date == today && s.Status == StayStatus.Active)
+            .ToList();
+
+        UpdateCardBadge(pnlDeparturesCard, departures.Count);
+        lblDeparturesHeader.Text = $"Departures Today";
+
+        if (departures.Count == 0)
+        {
+            flpDepartures.Controls.Add(CreateEmptyState("No departures today"));
+            return;
+        }
+
+        foreach (var stay in departures)
+            flpDepartures.Controls.Add(CreateDepartureRow(stay));
+    }
+
+    private void RefreshHousekeepingPanel()
+    {
+        flpHousekeeping.Controls.Clear();
+        var dirtyRooms = _store.Rooms
+            .Where(r => r.Status == RoomStatus.NeedsCleaning)
+            .ToList();
+
+        UpdateCardBadge(pnlHousekeepingCard, dirtyRooms.Count);
+        lblHousekeepingHeader.Text = $"Housekeeping";
+
+        if (dirtyRooms.Count == 0)
+        {
+            flpHousekeeping.Controls.Add(CreateEmptyState("All rooms clean!"));
+            return;
+        }
+
+        foreach (var room in dirtyRooms)
+            flpHousekeeping.Controls.Add(CreateHousekeepingRow(room));
+    }
+
+    private void RefreshActiveOrdersPanel()
+    {
+        flpActiveOrders.Controls.Clear();
+        var orders = _store.Orders
+            .Where(o => o.Status is OrderStatus.Placed or OrderStatus.Preparing or OrderStatus.Ready)
+            .ToList();
+
+        UpdateCardBadge(pnlOrdersCard, orders.Count);
+        lblOrdersHeader.Text = $"Active Orders";
+
+        if (orders.Count == 0)
+        {
+            flpActiveOrders.Controls.Add(CreateEmptyState("No active orders"));
+            return;
+        }
+
+        foreach (var order in orders)
+            flpActiveOrders.Controls.Add(CreateOrderRow(order));
+    }
+
+    private void UpdateCardBadge(Panel card, int count)
+    {
+        foreach (Control c in card.Controls)
+        {
+            if (c is Panel header)
+            {
+                foreach (Control hc in header.Controls)
+                {
+                    if (hc is Label lbl && lbl.Tag?.ToString() == "badge")
+                    {
+                        lbl.Text = count.ToString();
+                        lbl.Invalidate();
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Row builders ---
+
+    private Panel CreateArrivalRow(Reservation res)
+    {
+        var row = new Panel
+        {
+            Size = new Size(flpArrivals.Width - 32, 60),
+            BackColor = Color.FromArgb(245, 248, 255),
+            Margin = new Padding(0, 2, 0, 2)
+        };
+        row.Paint += (s, e) =>
+        {
+            using var pen = new Pen(AppColors.Gray200);
+            e.Graphics.DrawRectangle(pen, 0, 0, row.Width - 1, row.Height - 1);
+        };
+
+        var lblName = new Label
+        {
+            Text = res.Guest.Name,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            Location = new Point(10, 6),
+            AutoSize = true
+        };
+
+        var lblInfo = new Label
+        {
+            Text = $"Room {res.Room.Number} {res.Room.Type}",
+            Font = new Font("Segoe UI", 9),
+            ForeColor = AppColors.Gray500,
+            Location = new Point(10, 28),
+            AutoSize = true
+        };
+
+        var btn = new Button
+        {
+            Text = "Check In",
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(75, 28),
+            Location = new Point(row.Width - 90, 16),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Cursor = Cursors.Hand,
+            Tag = res
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        btn.Click += BtnQuickCheckIn_Click;
+
+        row.Controls.AddRange(new Control[] { lblName, lblInfo, btn });
+        return row;
+    }
+
+    private Panel CreateDepartureRow(Stay stay)
+    {
+        var row = new Panel
+        {
+            Size = new Size(flpDepartures.Width - 32, 60),
+            BackColor = Color.FromArgb(245, 248, 255),
+            Margin = new Padding(0, 2, 0, 2)
+        };
+        row.Paint += (s, e) =>
+        {
+            using var pen = new Pen(AppColors.Gray200);
+            e.Graphics.DrawRectangle(pen, 0, 0, row.Width - 1, row.Height - 1);
+        };
+
+        var lblName = new Label
+        {
+            Text = stay.Guest.Name,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            Location = new Point(10, 6),
+            AutoSize = true
+        };
+
+        var lblInfo = new Label
+        {
+            Text = $"Room {stay.Room.Number} {stay.Room.Type}  ${stay.TotalCharges:F2}",
+            Font = new Font("Segoe UI", 9),
+            ForeColor = AppColors.Gray500,
+            Location = new Point(10, 28),
+            AutoSize = true
+        };
+
+        var btn = new Button
+        {
+            Text = "Check Out",
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            BackColor = AppColors.Primary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(80, 28),
+            Location = new Point(row.Width - 95, 16),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Cursor = Cursors.Hand,
+            Tag = stay
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        btn.Click += BtnQuickCheckOut_Click;
+
+        row.Controls.AddRange(new Control[] { lblName, lblInfo, btn });
+        return row;
+    }
+
+    private Panel CreateHousekeepingRow(Room room)
+    {
+        var row = new Panel
+        {
+            Size = new Size(flpHousekeeping.Width - 32, 50),
+            BackColor = Color.FromArgb(255, 250, 240),
+            Margin = new Padding(0, 2, 0, 2)
+        };
+        row.Paint += (s, e) =>
+        {
+            using var pen = new Pen(AppColors.Gray200);
+            e.Graphics.DrawRectangle(pen, 0, 0, row.Width - 1, row.Height - 1);
+        };
+
+        var lblRoom = new Label
+        {
+            Text = $"Room {room.Number}",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            Location = new Point(10, 6),
+            AutoSize = true
+        };
+
+        var lblType = new Label
+        {
+            Text = room.Type.ToString(),
+            Font = new Font("Segoe UI", 9),
+            ForeColor = AppColors.Gray500,
+            Location = new Point(10, 26),
+            AutoSize = true
+        };
+
+        var btn = new Button
+        {
+            Text = "Mark Clean",
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            BackColor = AppColors.StatusClean,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(82, 28),
+            Location = new Point(row.Width - 97, 11),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Cursor = Cursors.Hand,
+            Tag = room
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        btn.Click += BtnMarkClean_Click;
+
+        row.Controls.AddRange(new Control[] { lblRoom, lblType, btn });
+        return row;
+    }
+
+    private Panel CreateOrderRow(RestaurantOrder order)
+    {
+        var row = new Panel
+        {
+            Size = new Size(flpActiveOrders.Width - 32, 50),
+            BackColor = Color.FromArgb(255, 252, 240),
+            Margin = new Padding(0, 2, 0, 2)
+        };
+        row.Paint += (s, e) =>
+        {
+            using var pen = new Pen(AppColors.Gray200);
+            e.Graphics.DrawRectangle(pen, 0, 0, row.Width - 1, row.Height - 1);
+        };
+
+        var lblGuest = new Label
+        {
+            Text = $"{order.Stay.Guest.Name} - Rm {order.Stay.Room.Number}",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            Location = new Point(10, 6),
+            AutoSize = true
+        };
+
+        var lblTotal = new Label
+        {
+            Text = $"${order.Total:F2}",
+            Font = new Font("Segoe UI", 9),
+            ForeColor = AppColors.Gray600,
+            Location = new Point(10, 26),
+            AutoSize = true
+        };
+
+        var statusColor = AppColors.GetOrderStatusColor(order.Status);
+        var lblStatus = new Label
+        {
+            Text = order.Status.ToString(),
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = statusColor,
+            AutoSize = false,
+            Size = new Size(70, 20),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Location = new Point(row.Width - 85, 15),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+
+        row.Controls.AddRange(new Control[] { lblGuest, lblTotal, lblStatus });
+        return row;
+    }
+
+    private Label CreateEmptyState(string message)
+    {
+        return new Label
+        {
+            Text = message,
+            Font = new Font("Segoe UI", 10, FontStyle.Italic),
+            ForeColor = AppColors.Gray400,
+            AutoSize = true,
+            Padding = new Padding(4, 12, 0, 0)
+        };
+    }
+
+    // --- Quick action handlers ---
+
+    private void BtnQuickCheckIn_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not Reservation res) return;
+
+        _bookingService.CheckIn(res);
+        MessageBox.Show($"Guest {res.Guest.Name} checked into Room {res.Room.Number}.",
+            "Check In", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        RefreshDashboard();
+    }
+
+    private void BtnQuickCheckOut_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not Stay stay) return;
+
+        var total = _bookingService.CheckOut(stay);
+        MessageBox.Show($"Guest {stay.Guest.Name} checked out.\nTotal charges: ${total:F2}",
+            "Check Out", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        RefreshDashboard();
+    }
+
+    private void BtnMarkClean_Click(object? sender, EventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not Room room) return;
+
+        _roomService.MarkClean(room);
+        RefreshDashboard();
     }
 
     // ===================== RESERVATIONS =====================

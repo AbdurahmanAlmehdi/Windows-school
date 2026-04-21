@@ -1,3 +1,4 @@
+using System.Drawing.Drawing2D;
 using HotelManagement.WinForms.Theme;
 
 namespace HotelManagement.WinForms.Forms;
@@ -19,22 +20,41 @@ partial class MainForm
     private TabPage tabRestaurant = null!;
     private TabPage tabReports = null!;
 
-    // Dashboard controls
+    // Dashboard - Welcome bar
+    private Panel pnlWelcomeBar = null!;
+    private Label lblGreeting = null!;
+    private Label lblDate = null!;
+    private Button btnRefreshDash = null!;
+
+    // Dashboard - KPI cards
+    private TableLayoutPanel tblKPI = null!;
     private Panel pnlOccupancy = null!;
     private Label lblOccupancyValue = null!;
     private Label lblOccupancyTitle = null!;
-    private Panel pnlArrivals = null!;
-    private Label lblArrivalsValue = null!;
-    private Label lblArrivalsTitle = null!;
-    private Panel pnlDepartures = null!;
-    private Label lblDeparturesValue = null!;
-    private Label lblDeparturesTitle = null!;
-    private Panel pnlHousekeeping = null!;
-    private Label lblHousekeepingValue = null!;
-    private Label lblHousekeepingTitle = null!;
-    private Panel pnlActiveOrders = null!;
-    private Label lblActiveOrdersValue = null!;
-    private Label lblActiveOrdersTitle = null!;
+    private Panel pnlAvailable = null!;
+    private Label lblAvailableValue = null!;
+    private Label lblAvailableTitle = null!;
+    private Panel pnlOccupied = null!;
+    private Label lblOccupiedValue = null!;
+    private Label lblOccupiedTitle = null!;
+    private Panel pnlOOS = null!;
+    private Label lblOOSValue = null!;
+    private Label lblOOSTitle = null!;
+
+    // Dashboard - Action panels
+    private TableLayoutPanel tblActions = null!;
+    private Panel pnlArrivalsCard = null!;
+    private Label lblArrivalsHeader = null!;
+    private FlowLayoutPanel flpArrivals = null!;
+    private Panel pnlDeparturesCard = null!;
+    private Label lblDeparturesHeader = null!;
+    private FlowLayoutPanel flpDepartures = null!;
+    private Panel pnlHousekeepingCard = null!;
+    private Label lblHousekeepingHeader = null!;
+    private FlowLayoutPanel flpHousekeeping = null!;
+    private Panel pnlOrdersCard = null!;
+    private Label lblOrdersHeader = null!;
+    private FlowLayoutPanel flpActiveOrders = null!;
 
     // Reservations controls
     private ComboBox cmbResFilter = null!;
@@ -213,45 +233,231 @@ partial class MainForm
 
     private void InitDashboardTab()
     {
-        var lblDashTitle = new Label
+        tabDashboard.Padding = new Padding(0);
+
+        // === Welcome Bar ===
+        pnlWelcomeBar = new Panel
         {
-            Text = "Dashboard Overview",
-            Font = new Font("Segoe UI", 18, FontStyle.Bold),
+            Dock = DockStyle.Top,
+            Height = 60,
+            BackColor = AppColors.Primary,
+            Padding = new Padding(20, 0, 20, 0)
+        };
+
+        lblGreeting = new Label
+        {
+            Text = "Welcome",
+            Font = new Font("Segoe UI", 15, FontStyle.Bold),
+            ForeColor = AppColors.Accent,
+            AutoSize = true,
+            Location = new Point(20, 8)
+        };
+
+        lblDate = new Label
+        {
+            Text = DateTime.Today.ToString("dddd, MMM dd, yyyy"),
+            Font = new Font("Segoe UI", 10),
+            ForeColor = Color.FromArgb(180, 255, 255, 255),
+            AutoSize = true,
+            Location = new Point(20, 34)
+        };
+
+        btnRefreshDash = new Button
+        {
+            Text = "Refresh",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = Color.FromArgb(50, 255, 255, 255),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(80, 30),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Cursor = Cursors.Hand
+        };
+        btnRefreshDash.FlatAppearance.BorderSize = 0;
+        btnRefreshDash.Click += (s, e) => RefreshDashboard();
+
+        pnlWelcomeBar.Controls.Add(lblGreeting);
+        pnlWelcomeBar.Controls.Add(lblDate);
+        pnlWelcomeBar.Controls.Add(btnRefreshDash);
+        pnlWelcomeBar.Resize += (s, e) =>
+        {
+            btnRefreshDash.Location = new Point(pnlWelcomeBar.Width - btnRefreshDash.Width - 20, 15);
+        };
+
+        // === KPI Row ===
+        tblKPI = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 140,
+            ColumnCount = 4,
+            RowCount = 1,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(12, 12, 12, 0)
+        };
+        tblKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+
+        pnlOccupancy = CreateKPICard("Occupancy", "0%", AppColors.Accent, out lblOccupancyValue, out lblOccupancyTitle, true);
+        pnlAvailable = CreateKPICard("Available", "0", AppColors.Tertiary, out lblAvailableValue, out lblAvailableTitle, false);
+        pnlOccupied = CreateKPICard("Occupied", "0", AppColors.Primary, out lblOccupiedValue, out lblOccupiedTitle, false);
+        pnlOOS = CreateKPICard("Out of Service", "0", AppColors.StatusOOS, out lblOOSValue, out lblOOSTitle, false);
+
+        tblKPI.Controls.Add(pnlOccupancy, 0, 0);
+        tblKPI.Controls.Add(pnlAvailable, 1, 0);
+        tblKPI.Controls.Add(pnlOccupied, 2, 0);
+        tblKPI.Controls.Add(pnlOOS, 3, 0);
+
+        // === Action Grid (2x2) ===
+        tblActions = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 2,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(12, 8, 12, 12)
+        };
+        tblActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        tblActions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
+        tblActions.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+        tblActions.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
+
+        pnlArrivalsCard = CreateDashboardCard("Arrivals Today", AppColors.Tertiary, out lblArrivalsHeader, out flpArrivals);
+        pnlDeparturesCard = CreateDashboardCard("Departures Today", AppColors.Primary, out lblDeparturesHeader, out flpDepartures);
+        pnlHousekeepingCard = CreateDashboardCard("Housekeeping", AppColors.StatusClean, out lblHousekeepingHeader, out flpHousekeeping);
+        pnlOrdersCard = CreateDashboardCard("Active Orders", AppColors.Accent, out lblOrdersHeader, out flpActiveOrders);
+
+        tblActions.Controls.Add(pnlArrivalsCard, 0, 0);
+        tblActions.Controls.Add(pnlDeparturesCard, 1, 0);
+        tblActions.Controls.Add(pnlHousekeepingCard, 0, 1);
+        tblActions.Controls.Add(pnlOrdersCard, 1, 1);
+
+        // Add in reverse dock order (Fill first, then Top items)
+        tabDashboard.Controls.Add(tblActions);
+        tabDashboard.Controls.Add(tblKPI);
+        tabDashboard.Controls.Add(pnlWelcomeBar);
+    }
+
+    private Panel CreateKPICard(string title, string defaultValue, Color accentColor,
+        out Label valueLabel, out Label titleLabel, bool hasArc)
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(6),
+            BackColor = Color.Transparent
+        };
+        panel.Paint += DrawingUtilities.PaintCardBackground;
+
+        titleLabel = new Label
+        {
+            Text = title.ToUpper(),
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            ForeColor = AppColors.Gray500,
+            AutoSize = true,
+            Location = new Point(16, 16)
+        };
+
+        valueLabel = new Label
+        {
+            Text = defaultValue,
+            Font = new Font("Segoe UI", 28, FontStyle.Bold),
+            ForeColor = accentColor,
+            AutoSize = true,
+            Location = new Point(16, 42)
+        };
+
+        panel.Controls.Add(titleLabel);
+        panel.Controls.Add(valueLabel);
+
+        if (hasArc)
+        {
+            panel.Paint += (s, e) =>
+            {
+                if (float.TryParse(lblOccupancyValue.Text.TrimEnd('%'), out var pct))
+                {
+                    var arcRect = new Rectangle(panel.Width - 90, 20, 70, 70);
+                    DrawingUtilities.DrawProgressArc(e.Graphics, arcRect, pct,
+                        AppColors.Accent, AppColors.Gray200, 6);
+                }
+            };
+        }
+
+        return panel;
+    }
+
+    private Panel CreateDashboardCard(string title, Color headerColor,
+        out Label headerLabel, out FlowLayoutPanel contentPanel)
+    {
+        var card = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Margin = new Padding(6),
+            BackColor = Color.Transparent
+        };
+        card.Paint += DrawingUtilities.PaintCardBackground;
+
+        var headerBar = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            BackColor = Color.Transparent
+        };
+
+        var hdrLbl = new Label
+        {
+            Text = title,
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
             ForeColor = AppColors.Primary,
             AutoSize = true,
-            Dock = DockStyle.Top
+            Location = new Point(16, 10)
         };
-        tabDashboard.Controls.Add(lblDashTitle);
+        headerLabel = hdrLbl;
 
-        var flpDashboard = new FlowLayoutPanel
+        var badge = new Label
+        {
+            Text = "0",
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = headerColor,
+            AutoSize = false,
+            Size = new Size(26, 20),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Location = new Point(hdrLbl.Right + 8, 12)
+        };
+        badge.Paint += (s, e) =>
+        {
+            using var path = DrawingUtilities.CreateRoundedRect(new Rectangle(0, 0, badge.Width - 1, badge.Height - 1), 8);
+            using var brush = new SolidBrush(headerColor);
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            e.Graphics.FillPath(brush, path);
+            TextRenderer.DrawText(e.Graphics, badge.Text, badge.Font, new Rectangle(0, 0, badge.Width, badge.Height),
+                Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        };
+        badge.Tag = "badge";
+
+        headerBar.Controls.Add(hdrLbl);
+        headerBar.Controls.Add(badge);
+
+        hdrLbl.TextChanged += (s, e) =>
+        {
+            badge.Location = new Point(hdrLbl.Right + 8, 12);
+        };
+
+        contentPanel = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
-            Padding = new Padding(0, 10, 0, 0),
-            WrapContents = true,
-            BackColor = AppColors.Surface
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            BackColor = Color.Transparent,
+            Padding = new Padding(12, 4, 12, 8)
         };
 
-        pnlOccupancy = CreateMetricCard("Occupancy Rate", AppColors.Primary, out lblOccupancyValue, out lblOccupancyTitle, new Size(540, 100));
-        pnlOccupancy.Margin = new Padding(0, 0, 10, 10);
-
-        pnlArrivals = CreateMetricCard("Arrivals Today", AppColors.Tertiary, out lblArrivalsValue, out lblArrivalsTitle, new Size(260, 100));
-        pnlArrivals.Margin = new Padding(0, 0, 10, 10);
-
-        pnlDepartures = CreateMetricCard("Departures Today", AppColors.Primary, out lblDeparturesValue, out lblDeparturesTitle, new Size(260, 100));
-        pnlDepartures.Margin = new Padding(0, 0, 10, 10);
-
-        pnlHousekeeping = CreateMetricCard("Needs Cleaning", AppColors.StatusClean, out lblHousekeepingValue, out lblHousekeepingTitle, new Size(260, 100));
-        pnlHousekeeping.Margin = new Padding(0, 0, 10, 10);
-
-        pnlActiveOrders = CreateMetricCard("Active Orders", AppColors.Tertiary, out lblActiveOrdersValue, out lblActiveOrdersTitle, new Size(260, 100));
-        pnlActiveOrders.Margin = new Padding(0, 0, 10, 10);
-
-        flpDashboard.Controls.AddRange(new Control[] {
-            pnlOccupancy, pnlArrivals, pnlDepartures, pnlHousekeeping, pnlActiveOrders
-        });
-
-        tabDashboard.Controls.Add(flpDashboard);
+        card.Controls.Add(contentPanel);
+        card.Controls.Add(headerBar);
+        return card;
     }
 
     private void InitReservationsTab()
