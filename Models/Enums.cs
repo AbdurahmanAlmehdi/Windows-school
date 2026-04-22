@@ -1,9 +1,8 @@
 namespace HotelManagement.WinForms.Models;
 
-public enum RoomStatus
+public enum RoomCondition
 {
-    Available,
-    Occupied,
+    Clean,
     NeedsCleaning,
     OutOfService
 }

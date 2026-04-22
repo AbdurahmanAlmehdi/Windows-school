@@ -56,6 +56,7 @@ public class BookingService
         var orders = _store.Orders.Where(o => o.Stay == stay);
         stay.RestaurantCharges = orders.Sum(o => o.Total);
 
+        _roomService.MarkVacant(stay.Room);
         _roomService.MarkNeedsCleaning(stay.Room);
         stay.Guest.StayCount++;
 

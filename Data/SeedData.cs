@@ -11,16 +11,16 @@ public static class SeedData
         store.Users.Add(new User { Username = "staff", Password = "staff123", Role = UserRole.Staff });
 
         // Rooms
-        store.Rooms.Add(new Room { Number = 101, Type = RoomType.Single, Rate = 99.99m, Status = RoomStatus.Available });
-        store.Rooms.Add(new Room { Number = 102, Type = RoomType.Single, Rate = 99.99m, Status = RoomStatus.Available });
-        store.Rooms.Add(new Room { Number = 201, Type = RoomType.Double, Rate = 149.99m, Status = RoomStatus.Occupied });
-        store.Rooms.Add(new Room { Number = 202, Type = RoomType.Double, Rate = 149.99m, Status = RoomStatus.Available });
-        store.Rooms.Add(new Room { Number = 301, Type = RoomType.Suite, Rate = 249.99m, Status = RoomStatus.Occupied });
-        store.Rooms.Add(new Room { Number = 302, Type = RoomType.Suite, Rate = 249.99m, Status = RoomStatus.NeedsCleaning });
-        store.Rooms.Add(new Room { Number = 401, Type = RoomType.Deluxe, Rate = 349.99m, Status = RoomStatus.Available });
-        store.Rooms.Add(new Room { Number = 402, Type = RoomType.Deluxe, Rate = 349.99m, Status = RoomStatus.Available });
-        store.Rooms.Add(new Room { Number = 501, Type = RoomType.Penthouse, Rate = 599.99m, Status = RoomStatus.OutOfService, MaintenanceLog = "Plumbing repair scheduled" });
-        store.Rooms.Add(new Room { Number = 502, Type = RoomType.Penthouse, Rate = 599.99m, Status = RoomStatus.Available });
+        store.Rooms.Add(new Room { Number = 101, Type = RoomType.Single, Rate = 99.99m });
+        store.Rooms.Add(new Room { Number = 102, Type = RoomType.Single, Rate = 99.99m });
+        store.Rooms.Add(new Room { Number = 201, Type = RoomType.Double, Rate = 149.99m, IsOccupied = true });
+        store.Rooms.Add(new Room { Number = 202, Type = RoomType.Double, Rate = 149.99m });
+        store.Rooms.Add(new Room { Number = 301, Type = RoomType.Suite, Rate = 249.99m, IsOccupied = true });
+        store.Rooms.Add(new Room { Number = 302, Type = RoomType.Suite, Rate = 249.99m, Condition = RoomCondition.NeedsCleaning });
+        store.Rooms.Add(new Room { Number = 401, Type = RoomType.Deluxe, Rate = 349.99m });
+        store.Rooms.Add(new Room { Number = 402, Type = RoomType.Deluxe, Rate = 349.99m });
+        store.Rooms.Add(new Room { Number = 501, Type = RoomType.Penthouse, Rate = 599.99m, Condition = RoomCondition.OutOfService, MaintenanceLog = "Plumbing repair scheduled" });
+        store.Rooms.Add(new Room { Number = 502, Type = RoomType.Penthouse, Rate = 599.99m });
 
         // Guests
         var guest1 = new Guest { Name = "John Smith", Contact = "555-0101", IsVip = true, StayCount = 5 };

@@ -15,7 +15,7 @@ public class ReportService
     public double GetOccupancyRate()
     {
         if (_store.Rooms.Count == 0) return 0;
-        return (double)_store.Rooms.Count(r => r.Status == RoomStatus.Occupied) / _store.Rooms.Count * 100;
+        return (double)_store.Rooms.Count(r => r.IsOccupied) / _store.Rooms.Count * 100;
     }
 
     public Dictionary<RoomType, decimal> GetRevenueByRoomType()

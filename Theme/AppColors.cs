@@ -23,12 +23,22 @@ public static class AppColors
     public static readonly Color Gray900 = ColorTranslator.FromHtml("#171717");
     public static readonly Color Gray950 = ColorTranslator.FromHtml("#0A0A0A");
 
-    public static Color GetRoomStatusColor(Models.RoomStatus status) => status switch
+    public static Color GetRoomCardColor(Models.Room room)
     {
-        Models.RoomStatus.Available => Tertiary,
-        Models.RoomStatus.Occupied => Primary,
-        Models.RoomStatus.NeedsCleaning => StatusClean,
-        Models.RoomStatus.OutOfService => StatusOOS,
+        if (room.Condition == Models.RoomCondition.OutOfService) return StatusOOS;
+        if (room.IsOccupied && room.Condition == Models.RoomCondition.NeedsCleaning) return StatusClean;
+        if (room.IsOccupied) return Primary;
+        if (room.Condition == Models.RoomCondition.NeedsCleaning) return StatusClean;
+        return Tertiary; // Available
+    }
+
+    public static Color GetRoomStatusBadgeColor(string displayStatus) => displayStatus switch
+    {
+        "Available" => Tertiary,
+        "Occupied" => Primary,
+        "Occupied + Needs Cleaning" => StatusClean,
+        "Needs Cleaning" => StatusClean,
+        "Out of Service" => StatusOOS,
         _ => Gray500
     };
 

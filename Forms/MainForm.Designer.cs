@@ -90,8 +90,30 @@ partial class MainForm
     private Button btnMarkPaid = null!;
 
     // Rooms controls
-    private ComboBox cmbRoomFilter = null!;
+    private ComboBox cmbRoomTypeFilter = null!;
+    private ComboBox cmbRoomStatusFilter = null!;
     private FlowLayoutPanel flpRooms = null!;
+    // Room KPI labels
+    private Label lblRoomOccupancyValue = null!;
+    private Label lblRoomAvailableValue = null!;
+    private Label lblRoomCleaningValue = null!;
+    private Label lblRoomOOSValue = null!;
+    // Room detail panel
+    private Panel pnlRoomDetail = null!;
+    private Label lblRoomDetailTitle = null!;
+    private Label lblRoomDetailType = null!;
+    private Label lblRoomDetailRate = null!;
+    private Label lblRoomDetailStatus = null!;
+    private Label lblRoomDetailGuest = null!;
+    private Label lblRoomDetailMaintenance = null!;
+    // Room condition action buttons
+    private Button btnMarkClean = null!;
+    private Button btnMarkNeedsCleaning = null!;
+    private Button btnMarkOutOfService = null!;
+    // Room management buttons (manager-only)
+    private Button btnAddRoom = null!;
+    private Button btnEditRoom = null!;
+    private Button btnRemoveRoom = null!;
 
     // Restaurant controls
     private DataGridView dgvMenu = null!;
@@ -805,46 +827,307 @@ partial class MainForm
 
     private void InitRoomsTab()
     {
+        tabRooms.Padding = new Padding(0);
+
+        // === Navy Header Bar ===
+        var pnlRoomHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 55,
+            BackColor = AppColors.Primary
+        };
+
         var lblRoomsTitle = new Label
         {
             Text = "Room Management",
-            Font = new Font("Segoe UI", 18, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            ForeColor = AppColors.Accent,
             AutoSize = true,
-            Location = new Point(0, 0)
+            Location = new Point(20, 12)
         };
-        tabRooms.Controls.Add(lblRoomsTitle);
+        pnlRoomHeader.Controls.Add(lblRoomsTitle);
 
-        var lblRFilter = new Label
-        {
-            Text = "Filter:",
-            Font = new Font("Segoe UI", 10),
-            Location = new Point(0, 42),
-            AutoSize = true
-        };
-        tabRooms.Controls.Add(lblRFilter);
-
-        cmbRoomFilter = new ComboBox
+        cmbRoomStatusFilter = new ComboBox
         {
             Font = new Font("Segoe UI", 10),
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(50, 38),
-            Size = new Size(160, 28)
+            Size = new Size(150, 28),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
         };
-        cmbRoomFilter.Items.AddRange(new object[] { "All", "Available", "Occupied", "NeedsCleaning", "OutOfService" });
-        cmbRoomFilter.SelectedIndex = 0;
-        cmbRoomFilter.SelectedIndexChanged += CmbRoomFilter_Changed;
-        tabRooms.Controls.Add(cmbRoomFilter);
+        cmbRoomStatusFilter.Items.AddRange(new object[] { "All Status", "Available", "Occupied", "Needs Cleaning", "Out of Service" });
+        cmbRoomStatusFilter.SelectedIndex = 0;
+        cmbRoomStatusFilter.SelectedIndexChanged += CmbRoomFilter_Changed;
+        pnlRoomHeader.Controls.Add(cmbRoomStatusFilter);
 
+        cmbRoomTypeFilter = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Size = new Size(120, 28),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        cmbRoomTypeFilter.Items.Add("All Types");
+        foreach (var rt in Enum.GetValues<RoomType>())
+            cmbRoomTypeFilter.Items.Add(rt.ToString());
+        cmbRoomTypeFilter.SelectedIndex = 0;
+        cmbRoomTypeFilter.SelectedIndexChanged += CmbRoomFilter_Changed;
+        pnlRoomHeader.Controls.Add(cmbRoomTypeFilter);
+
+        var lblTypeLbl = new Label
+        {
+            Text = "Type:",
+            Font = new Font("Segoe UI", 10),
+            ForeColor = Color.FromArgb(180, 255, 255, 255),
+            AutoSize = true,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        pnlRoomHeader.Controls.Add(lblTypeLbl);
+
+        var lblStatusLbl = new Label
+        {
+            Text = "Status:",
+            Font = new Font("Segoe UI", 10),
+            ForeColor = Color.FromArgb(180, 255, 255, 255),
+            AutoSize = true,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        pnlRoomHeader.Controls.Add(lblStatusLbl);
+
+        pnlRoomHeader.Resize += (s, e) =>
+        {
+            cmbRoomStatusFilter.Location = new Point(pnlRoomHeader.Width - cmbRoomStatusFilter.Width - 20, 14);
+            lblStatusLbl.Location = new Point(cmbRoomStatusFilter.Left - 55, 18);
+            cmbRoomTypeFilter.Location = new Point(lblStatusLbl.Left - cmbRoomTypeFilter.Width - 10, 14);
+            lblTypeLbl.Location = new Point(cmbRoomTypeFilter.Left - 45, 18);
+        };
+
+        // === KPI Row ===
+        var tblRoomKPI = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 110,
+            ColumnCount = 4,
+            RowCount = 1,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(12, 8, 12, 0)
+        };
+        tblRoomKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblRoomKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblRoomKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+        tblRoomKPI.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25));
+
+        Label _rd;
+        var kpiOcc = CreateKPICard("Occupancy Rate", "0%", AppColors.Accent, out lblRoomOccupancyValue, out _rd, false);
+        var kpiAvail = CreateKPICard("Available", "0", AppColors.Tertiary, out lblRoomAvailableValue, out _rd, false);
+        var kpiClean = CreateKPICard("Needs Cleaning", "0", AppColors.StatusClean, out lblRoomCleaningValue, out _rd, false);
+        var kpiOOS = CreateKPICard("Out of Service", "0", AppColors.StatusOOS, out lblRoomOOSValue, out _rd, false);
+
+        tblRoomKPI.Controls.Add(kpiOcc, 0, 0);
+        tblRoomKPI.Controls.Add(kpiAvail, 1, 0);
+        tblRoomKPI.Controls.Add(kpiClean, 2, 0);
+        tblRoomKPI.Controls.Add(kpiOOS, 3, 0);
+
+        // === SplitContainer ===
+        var splitRooms = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            SplitterDistance = 620,
+            Orientation = Orientation.Vertical,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(12, 8, 12, 12)
+        };
+
+        // LEFT: Room cards + manager buttons
         flpRooms = new FlowLayoutPanel
         {
-            Location = new Point(0, 75),
-            Size = new Size(700, 500),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+            Dock = DockStyle.Fill,
             AutoScroll = true,
-            BackColor = AppColors.Surface
+            BackColor = AppColors.Surface,
+            Padding = new Padding(4)
         };
-        tabRooms.Controls.Add(flpRooms);
+
+        var pnlRoomMgmtButtons = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 4, 0, 0)
+        };
+
+        btnAddRoom = new Button
+        {
+            Text = "Add Room",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(100, 34),
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 6, 0)
+        };
+        btnAddRoom.FlatAppearance.BorderSize = 0;
+        btnAddRoom.Click += BtnAddRoom_Click;
+
+        btnEditRoom = new Button
+        {
+            Text = "Edit Room",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = AppColors.Primary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(100, 34),
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 6, 0)
+        };
+        btnEditRoom.FlatAppearance.BorderSize = 0;
+        btnEditRoom.Click += BtnEditRoom_Click;
+
+        btnRemoveRoom = new Button
+        {
+            Text = "Remove Room",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = AppColors.StatusOOS,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(110, 34),
+            Cursor = Cursors.Hand
+        };
+        btnRemoveRoom.FlatAppearance.BorderSize = 0;
+        btnRemoveRoom.Click += BtnRemoveRoom_Click;
+
+        pnlRoomMgmtButtons.Controls.AddRange(new Control[] { btnAddRoom, btnEditRoom, btnRemoveRoom });
+
+        splitRooms.Panel1.Controls.Add(flpRooms);
+        splitRooms.Panel1.Controls.Add(pnlRoomMgmtButtons);
+
+        // RIGHT: Room detail panel
+        pnlRoomDetail = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            Padding = new Padding(8)
+        };
+        pnlRoomDetail.Paint += DrawingUtilities.PaintCardBackground;
+
+        lblRoomDetailTitle = new Label
+        {
+            Text = "Select a room to view details",
+            Font = new Font("Segoe UI", 14, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            AutoSize = true,
+            Location = new Point(20, 16)
+        };
+
+        lblRoomDetailType = new Label
+        {
+            Text = "",
+            Font = new Font("Segoe UI", 11),
+            ForeColor = AppColors.Gray600,
+            AutoSize = true,
+            Location = new Point(20, 48)
+        };
+
+        lblRoomDetailRate = new Label
+        {
+            Text = "",
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            ForeColor = AppColors.Accent,
+            AutoSize = true,
+            Location = new Point(20, 76)
+        };
+
+        lblRoomDetailStatus = new Label
+        {
+            Text = "",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = false,
+            Size = new Size(200, 26),
+            TextAlign = ContentAlignment.MiddleCenter,
+            Location = new Point(20, 110),
+            Visible = false
+        };
+
+        lblRoomDetailGuest = new Label
+        {
+            Text = "",
+            Font = new Font("Segoe UI", 10),
+            ForeColor = AppColors.Primary,
+            AutoSize = true,
+            Location = new Point(20, 146),
+            Visible = false
+        };
+
+        lblRoomDetailMaintenance = new Label
+        {
+            Text = "",
+            Font = new Font("Segoe UI", 10),
+            ForeColor = AppColors.Gray500,
+            AutoSize = true,
+            MaximumSize = new Size(350, 0),
+            Location = new Point(20, 176),
+            Visible = false
+        };
+
+        // Condition action buttons
+        btnMarkClean = new Button
+        {
+            Text = "Mark Clean",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(130, 36),
+            Location = new Point(20, 220),
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+        btnMarkClean.FlatAppearance.BorderSize = 0;
+        btnMarkClean.Click += BtnRoomMarkClean_Click;
+
+        btnMarkNeedsCleaning = new Button
+        {
+            Text = "Needs Cleaning",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.StatusClean,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(150, 36),
+            Location = new Point(158, 220),
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+        btnMarkNeedsCleaning.FlatAppearance.BorderSize = 0;
+        btnMarkNeedsCleaning.Click += BtnRoomMarkNeedsCleaning_Click;
+
+        btnMarkOutOfService = new Button
+        {
+            Text = "Out of Service",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.StatusOOS,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(140, 36),
+            Location = new Point(20, 264),
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+        btnMarkOutOfService.FlatAppearance.BorderSize = 0;
+        btnMarkOutOfService.Click += BtnRoomMarkOutOfService_Click;
+
+        pnlRoomDetail.Controls.AddRange(new Control[] {
+            lblRoomDetailTitle, lblRoomDetailType, lblRoomDetailRate,
+            lblRoomDetailStatus, lblRoomDetailGuest, lblRoomDetailMaintenance,
+            btnMarkClean, btnMarkNeedsCleaning, btnMarkOutOfService
+        });
+
+        splitRooms.Panel2.Controls.Add(pnlRoomDetail);
+
+        // Add in reverse dock order
+        tabRooms.Controls.Add(splitRooms);
+        tabRooms.Controls.Add(tblRoomKPI);
+        tabRooms.Controls.Add(pnlRoomHeader);
     }
 
     private void InitRestaurantTab()

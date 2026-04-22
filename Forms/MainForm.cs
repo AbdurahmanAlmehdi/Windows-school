@@ -17,6 +17,7 @@ public partial class MainForm : Form
     private readonly DataStore _store;
 
     private Guest? _lookedUpGuest;
+    private Room? _selectedRoom;
     private readonly BindingList<OrderLine> _currentOrderLines = new();
 
     public MainForm(
@@ -41,14 +42,19 @@ public partial class MainForm : Form
         // Position logout button
         btnLogout.Location = new Point(panelHeader.Width - btnLogout.Width - 12, 8);
 
-        // Hide Reports tab and menu management for non-managers
+        // Hide Reports tab for now
+        tabMain.TabPages.Remove(tabReports);
+
+        // Hide management controls for non-managers
         if (_authService.CurrentUser != null && !_authService.CurrentUser.IsManager)
         {
-            tabMain.TabPages.Remove(tabReports);
             btnAddMenuItem.Visible = false;
             btnEditMenuItem.Visible = false;
             btnToggleAvail.Visible = false;
             btnRemoveMenuItem.Visible = false;
+            btnAddRoom.Visible = false;
+            btnEditRoom.Visible = false;
+            btnRemoveRoom.Visible = false;
         }
 
         Load += MainForm_Load;
@@ -109,13 +115,13 @@ public partial class MainForm : Form
         var occupancyRate = _reportService.GetOccupancyRate();
         lblOccupancyValue.Text = $"{occupancyRate:F1}%";
 
-        var available = _store.Rooms.Count(r => r.Status == RoomStatus.Available);
+        var available = _store.Rooms.Count(r => r.IsAvailable);
         lblAvailableValue.Text = available.ToString();
 
-        var occupied = _store.Rooms.Count(r => r.Status == RoomStatus.Occupied);
+        var occupied = _store.Rooms.Count(r => r.IsOccupied);
         lblOccupiedValue.Text = occupied.ToString();
 
-        var oos = _store.Rooms.Count(r => r.Status == RoomStatus.OutOfService);
+        var oos = _store.Rooms.Count(r => r.Condition == RoomCondition.OutOfService);
         lblOOSValue.Text = oos.ToString();
 
         pnlOccupancy.Invalidate();
@@ -167,7 +173,7 @@ public partial class MainForm : Form
     {
         flpHousekeeping.Controls.Clear();
         var dirtyRooms = _store.Rooms
-            .Where(r => r.Status == RoomStatus.NeedsCleaning)
+            .Where(r => r.Condition == RoomCondition.NeedsCleaning)
             .ToList();
 
         UpdateCardBadge(pnlHousekeepingCard, dirtyRooms.Count);
@@ -682,14 +688,41 @@ public partial class MainForm : Form
 
     private void RefreshRooms()
     {
+        RefreshRoomKPIs();
+        RefreshRoomCards();
+        RefreshRoomDetail();
+    }
+
+    private void RefreshRoomKPIs()
+    {
+        var total = _store.Rooms.Count;
+        var occupied = _store.Rooms.Count(r => r.IsOccupied);
+        var available = _store.Rooms.Count(r => r.IsAvailable);
+        var cleaning = _store.Rooms.Count(r => r.Condition == RoomCondition.NeedsCleaning);
+        var oos = _store.Rooms.Count(r => r.Condition == RoomCondition.OutOfService);
+
+        var rate = total > 0 ? (double)occupied / total * 100 : 0;
+        lblRoomOccupancyValue.Text = $"{rate:F1}%";
+        lblRoomAvailableValue.Text = available.ToString();
+        lblRoomCleaningValue.Text = cleaning.ToString();
+        lblRoomOOSValue.Text = oos.ToString();
+    }
+
+    private void RefreshRoomCards()
+    {
         flpRooms.Controls.Clear();
-        var filter = cmbRoomFilter.SelectedItem?.ToString() ?? "All";
+        var typeFilter = cmbRoomTypeFilter.SelectedItem?.ToString() ?? "All Types";
+        var statusFilter = cmbRoomStatusFilter.SelectedItem?.ToString() ?? "All Status";
 
-        var rooms = filter == "All"
-            ? _store.Rooms.ToList()
-            : _store.Rooms.Where(r => r.Status.ToString() == filter).ToList();
+        var rooms = _store.Rooms.AsEnumerable();
 
-        foreach (var room in rooms)
+        if (typeFilter != "All Types")
+            rooms = rooms.Where(r => r.Type.ToString() == typeFilter);
+
+        if (statusFilter != "All Status")
+            rooms = rooms.Where(r => r.DisplayStatus == statusFilter);
+
+        foreach (var room in rooms.ToList())
         {
             var card = CreateRoomCard(room);
             flpRooms.Controls.Add(card);
@@ -700,18 +733,21 @@ public partial class MainForm : Form
     {
         var card = new Panel
         {
-            Size = new Size(180, 130),
+            Size = new Size(180, 160),
             BackColor = Color.White,
             Margin = new Padding(8),
-            Cursor = Cursors.Hand
+            Cursor = Cursors.Hand,
+            Tag = room
         };
         card.Paint += (s, e) =>
         {
-            using var pen = new Pen(AppColors.Gray200, 1);
+            using var pen = new Pen(
+                _selectedRoom == room ? AppColors.Accent : AppColors.Gray200,
+                _selectedRoom == room ? 2 : 1);
             e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
         };
 
-        var statusColor = AppColors.GetRoomStatusColor(room.Status);
+        var statusColor = AppColors.GetRoomCardColor(room);
 
         var statusBar = new Panel
         {
@@ -747,16 +783,30 @@ public partial class MainForm : Form
             AutoSize = true
         };
 
+        var displayStatus = room.DisplayStatus;
+        var badgeColor = AppColors.GetRoomStatusBadgeColor(displayStatus);
         var lblStatus = new Label
         {
-            Text = room.Status.ToString(),
-            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            Text = displayStatus,
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
             ForeColor = Color.White,
-            BackColor = statusColor,
+            BackColor = badgeColor,
             AutoSize = false,
-            Size = new Size(120, 22),
+            Size = new Size(160, 22),
             Location = new Point(10, 90),
             TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        // Show guest name if occupied
+        var stay = room.IsOccupied ? _roomService.GetCurrentStay(room) : null;
+        var lblGuest = new Label
+        {
+            Text = stay != null ? $"Guest: {stay.Guest.Name}" : "",
+            Font = new Font("Segoe UI", 8),
+            ForeColor = AppColors.Gray600,
+            Location = new Point(10, 118),
+            AutoSize = true,
+            MaximumSize = new Size(160, 0)
         };
 
         card.Controls.Add(statusBar);
@@ -764,23 +814,239 @@ public partial class MainForm : Form
         card.Controls.Add(lblType);
         card.Controls.Add(lblRate);
         card.Controls.Add(lblStatus);
+        card.Controls.Add(lblGuest);
 
-        // Context menu
-        var ctx = new ContextMenuStrip();
-        ctx.Items.Add("Mark Available / Clean", null, (s, e) => { _roomService.MarkClean(room); RefreshRooms(); });
-        ctx.Items.Add("Mark Needs Cleaning", null, (s, e) => { _roomService.MarkNeedsCleaning(room); RefreshRooms(); });
-        ctx.Items.Add("Mark Out of Service", null, (s, e) =>
-        {
-            var reason = Microsoft.VisualBasic.Interaction.InputBox("Enter reason:", "Out of Service", "");
-            if (!string.IsNullOrEmpty(reason))
-            {
-                _roomService.MarkOutOfService(room, reason);
-                RefreshRooms();
-            }
-        });
-        card.ContextMenuStrip = ctx;
+        // Click handler for card and all child controls
+        void onClick(object? s, EventArgs e) { RoomCard_Click(room); }
+        card.Click += onClick;
+        foreach (Control c in card.Controls)
+            c.Click += onClick;
 
         return card;
+    }
+
+    private void RoomCard_Click(Room room)
+    {
+        _selectedRoom = room;
+        RefreshRoomCards();
+        RefreshRoomDetail();
+    }
+
+    private void RefreshRoomDetail()
+    {
+        if (_selectedRoom == null)
+        {
+            lblRoomDetailTitle.Text = "Select a room to view details";
+            lblRoomDetailType.Text = "";
+            lblRoomDetailRate.Text = "";
+            lblRoomDetailStatus.Visible = false;
+            lblRoomDetailGuest.Visible = false;
+            lblRoomDetailMaintenance.Visible = false;
+            btnMarkClean.Visible = false;
+            btnMarkNeedsCleaning.Visible = false;
+            btnMarkOutOfService.Visible = false;
+            return;
+        }
+
+        var room = _selectedRoom;
+        lblRoomDetailTitle.Text = $"Room {room.Number} - {room.Type}";
+        lblRoomDetailType.Text = $"Type: {room.Type}";
+        lblRoomDetailRate.Text = $"${room.Rate:F2}/night";
+
+        var displayStatus = room.DisplayStatus;
+        lblRoomDetailStatus.Text = displayStatus;
+        lblRoomDetailStatus.BackColor = AppColors.GetRoomStatusBadgeColor(displayStatus);
+        lblRoomDetailStatus.Visible = true;
+
+        var stay = room.IsOccupied ? _roomService.GetCurrentStay(room) : null;
+        if (stay != null)
+        {
+            lblRoomDetailGuest.Text = $"Guest: {stay.Guest.Name}  |  Check-out: {stay.ExpectedCheckOut:MMM dd}";
+            lblRoomDetailGuest.Visible = true;
+        }
+        else
+        {
+            lblRoomDetailGuest.Visible = false;
+        }
+
+        if (!string.IsNullOrEmpty(room.MaintenanceLog))
+        {
+            lblRoomDetailMaintenance.Text = $"Maintenance: {room.MaintenanceLog}";
+            lblRoomDetailMaintenance.Visible = true;
+        }
+        else
+        {
+            lblRoomDetailMaintenance.Text = "Maintenance: —";
+            lblRoomDetailMaintenance.Visible = true;
+        }
+
+        // Show condition buttons
+        btnMarkClean.Visible = true;
+        btnMarkNeedsCleaning.Visible = true;
+        btnMarkOutOfService.Visible = true;
+    }
+
+    private void BtnRoomMarkClean_Click(object? sender, EventArgs e)
+    {
+        if (_selectedRoom == null) return;
+        _roomService.MarkClean(_selectedRoom);
+        RefreshRooms();
+    }
+
+    private void BtnRoomMarkNeedsCleaning_Click(object? sender, EventArgs e)
+    {
+        if (_selectedRoom == null) return;
+        _roomService.MarkNeedsCleaning(_selectedRoom);
+        RefreshRooms();
+    }
+
+    private void BtnRoomMarkOutOfService_Click(object? sender, EventArgs e)
+    {
+        if (_selectedRoom == null) return;
+        var reason = Microsoft.VisualBasic.Interaction.InputBox("Enter reason:", "Out of Service", "");
+        if (!string.IsNullOrEmpty(reason))
+        {
+            _roomService.MarkOutOfService(_selectedRoom, reason);
+            RefreshRooms();
+        }
+    }
+
+    private void BtnAddRoom_Click(object? sender, EventArgs e)
+    {
+        ShowRoomDialog(null);
+    }
+
+    private void BtnEditRoom_Click(object? sender, EventArgs e)
+    {
+        if (_selectedRoom == null)
+        {
+            MessageBox.Show("Select a room first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+        ShowRoomDialog(_selectedRoom);
+    }
+
+    private void BtnRemoveRoom_Click(object? sender, EventArgs e)
+    {
+        if (_selectedRoom == null)
+        {
+            MessageBox.Show("Select a room first.", "No Selection", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        if (_selectedRoom.IsOccupied)
+        {
+            MessageBox.Show("Cannot remove an occupied room.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return;
+        }
+
+        if (MessageBox.Show($"Remove Room {_selectedRoom.Number}?", "Confirm",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
+        {
+            _roomService.RemoveRoom(_selectedRoom);
+            _selectedRoom = null;
+            RefreshRooms();
+        }
+    }
+
+    private void ShowRoomDialog(Room? existing)
+    {
+        using var dlg = new Form
+        {
+            Text = existing == null ? "Add Room" : "Edit Room",
+            Size = new Size(340, 260),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = AppColors.Surface
+        };
+
+        var lblN = new Label { Text = "Number:", Font = new Font("Segoe UI", 10), Location = new Point(20, 20), AutoSize = true };
+        var nudNum = new NumericUpDown
+        {
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(110, 17),
+            Size = new Size(100, 28),
+            Minimum = 1,
+            Maximum = 9999,
+            Value = existing?.Number ?? 100
+        };
+
+        var lblT = new Label { Text = "Type:", Font = new Font("Segoe UI", 10), Location = new Point(20, 55), AutoSize = true };
+        var cmbType = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(110, 52),
+            Size = new Size(180, 28)
+        };
+        foreach (var rt in Enum.GetValues<RoomType>())
+            cmbType.Items.Add(rt);
+        cmbType.SelectedItem = existing?.Type ?? RoomType.Single;
+
+        var lblR = new Label { Text = "Rate:", Font = new Font("Segoe UI", 10), Location = new Point(20, 90), AutoSize = true };
+        var txtRate = new TextBox
+        {
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(110, 87),
+            Size = new Size(100, 28),
+            Text = existing?.Rate.ToString("F2") ?? "99.99"
+        };
+
+        var btnOk = new Button
+        {
+            Text = existing == null ? "Add" : "Save",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(100, 34),
+            Location = new Point(110, 135),
+            DialogResult = DialogResult.OK,
+            Cursor = Cursors.Hand
+        };
+        btnOk.FlatAppearance.BorderSize = 0;
+
+        var btnCancel = new Button
+        {
+            Text = "Cancel",
+            Font = new Font("Segoe UI", 10),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(80, 34),
+            Location = new Point(220, 135),
+            DialogResult = DialogResult.Cancel,
+            Cursor = Cursors.Hand
+        };
+
+        dlg.Controls.AddRange(new Control[] { lblN, nudNum, lblT, cmbType, lblR, txtRate, btnOk, btnCancel });
+        dlg.AcceptButton = btnOk;
+        dlg.CancelButton = btnCancel;
+
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            var number = (int)nudNum.Value;
+            var type = (RoomType)cmbType.SelectedItem!;
+            if (!decimal.TryParse(txtRate.Text, out var rate) || rate < 0)
+            {
+                MessageBox.Show("Enter a valid rate.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            try
+            {
+                if (existing == null)
+                    _roomService.AddRoom(number, type, rate);
+                else
+                    _roomService.UpdateRoom(existing, number, type, rate);
+
+                RefreshRooms();
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
     }
 
     private void CmbRoomFilter_Changed(object? sender, EventArgs e) => RefreshRooms();
