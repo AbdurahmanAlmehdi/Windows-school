@@ -1349,6 +1349,9 @@ partial class MainForm
             BackColor = AppColors.Surface
         };
 
+        // --- Left: filter + orders grid (will be added with Dock=Fill at the end) ---
+        var pnlOrdersLeft = new Panel { Dock = DockStyle.Fill, BackColor = AppColors.Surface };
+
         var pnlFilterRow = new Panel
         {
             Dock = DockStyle.Top,
