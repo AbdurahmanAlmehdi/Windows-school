@@ -14,7 +14,13 @@ public class BookingService
         _roomService = roomService;
     }
 
-    public Reservation CreateReservation(Guest guest, Room room, DateTime checkIn, DateTime checkOut)
+    public Reservation CreateReservation(
+        Guest guest,
+        Room room,
+        DateTime checkIn,
+        DateTime checkOut,
+        List<AccompanyingGuest>? accompanying = null,
+        string? marriageCertificatePath = null)
     {
         var reservation = new Reservation
         {
@@ -22,7 +28,9 @@ public class BookingService
             Room = room,
             CheckInDate = checkIn,
             CheckOutDate = checkOut,
-            Status = ReservationStatus.Confirmed
+            Status = ReservationStatus.Confirmed,
+            Accompanying = accompanying ?? new List<AccompanyingGuest>(),
+            MarriageCertificatePath = marriageCertificatePath
         };
         _store.Reservations.Add(reservation);
         return reservation;

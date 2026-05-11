@@ -52,12 +52,13 @@ public class RestaurantService
 
     public void RemoveMenuItem(MenuItem item) => _store.MenuItems.Remove(item);
 
-    public void UpdateMenuItem(MenuItem item, string name, decimal price, string category, bool isAvailable)
+    public void UpdateMenuItem(MenuItem item, string name, decimal price, string category, bool isAvailable, string? imagePath = null)
     {
         item.Name = name;
         item.Price = price;
         item.Category = category;
         item.IsAvailable = isAvailable;
+        if (imagePath != null) item.ImagePath = imagePath;
     }
 
     public void ToggleAvailability(MenuItem item) => item.IsAvailable = !item.IsAvailable;

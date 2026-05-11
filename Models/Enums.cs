@@ -66,3 +66,10 @@ public enum InvoiceLineCategory
     RoomCharge,
     RestaurantCharge
 }
+
+public enum Gender
+{
+    Unspecified,
+    Male,
+    Female
+}

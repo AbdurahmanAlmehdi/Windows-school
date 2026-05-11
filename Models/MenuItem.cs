@@ -7,6 +7,7 @@ public class MenuItem
     public string Category { get; set; } = string.Empty;
     public bool IsAvailable { get; set; } = true;
     public string Description { get; set; } = string.Empty;
+    public string? ImagePath { get; set; }
 
     public override string ToString() => $"{Name} - ${Price:F2}";
 }

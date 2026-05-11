@@ -64,14 +64,7 @@ partial class MainForm
     private Button btnCheckIn = null!;
     private Button btnCheckOut = null!;
     private Button btnCancelRes = null!;
-    private TextBox txtPhone = null!;
-    private Button btnLookup = null!;
-    private Label lblGuestStatus = null!;
-    private TextBox txtGuestName = null!;
-    private ComboBox cmbRoom = null!;
-    private DateTimePicker dtpCheckIn = null!;
-    private DateTimePicker dtpCheckOut = null!;
-    private Button btnCreateRes = null!;
+    private Button btnNewReservation = null!;
     // Reservation KPI labels
     private Label lblResKpiArrivals = null!;
     private Label lblResKpiActive = null!;
@@ -116,11 +109,11 @@ partial class MainForm
     private Button btnRemoveRoom = null!;
 
     // Restaurant controls
-    private DataGridView dgvMenu = null!;
+    private TabControl restSubTabs = null!;
+    private TabPage subTabOrder = null!;
+    private TabPage subTabActive = null!;
+    private FlowLayoutPanel flpMenuCards = null!;
     private ComboBox cmbStay = null!;
-    private ComboBox cmbMenuItem = null!;
-    private NumericUpDown nudQty = null!;
-    private Button btnAddLine = null!;
     private Button btnPlaceOrder = null!;
     private DataGridView dgvOrders = null!;
     private Button btnAdvanceOrder = null!;
@@ -136,7 +129,6 @@ partial class MainForm
     // Restaurant order filter
     private ComboBox cmbOrderFilter = null!;
     // Restaurant new order card controls
-    private TextBox txtLineNotes = null!;
     private DataGridView dgvCurrentOrderLines = null!;
     private Label lblRunningTotal = null!;
     private Button btnClearOrder = null!;
@@ -547,6 +539,21 @@ partial class MainForm
         };
         pnlResHeader.Controls.Add(lblResTitle);
 
+        btnNewReservation = new Button
+        {
+            Text = "+ New Reservation",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(170, 32),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Top | AnchorStyles.Right
+        };
+        btnNewReservation.FlatAppearance.BorderSize = 0;
+        btnNewReservation.Click += BtnNewReservation_Click;
+        pnlResHeader.Controls.Add(btnNewReservation);
+
         cmbResFilter = new ComboBox
         {
             Font = new Font("Segoe UI", 10),
@@ -558,10 +565,6 @@ partial class MainForm
         cmbResFilter.SelectedIndex = 0;
         cmbResFilter.SelectedIndexChanged += CmbResFilter_Changed;
         pnlResHeader.Controls.Add(cmbResFilter);
-        pnlResHeader.Resize += (s, e) =>
-        {
-            cmbResFilter.Location = new Point(pnlResHeader.Width - cmbResFilter.Width - 20, 14);
-        };
 
         var lblFilterLbl = new Label
         {
@@ -572,9 +575,12 @@ partial class MainForm
             Anchor = AnchorStyles.Top | AnchorStyles.Right
         };
         pnlResHeader.Controls.Add(lblFilterLbl);
+
         pnlResHeader.Resize += (s, e) =>
         {
-            lblFilterLbl.Location = new Point(pnlResHeader.Width - cmbResFilter.Width - 65, 18);
+            btnNewReservation.Location = new Point(pnlResHeader.Width - btnNewReservation.Width - 20, 12);
+            cmbResFilter.Location = new Point(btnNewReservation.Left - cmbResFilter.Width - 20, 14);
+            lblFilterLbl.Location = new Point(cmbResFilter.Left - 45, 18);
         };
 
         // === KPI Row ===
@@ -603,31 +609,27 @@ partial class MainForm
         tblResKPI.Controls.Add(kpiPend, 2, 0);
         tblResKPI.Controls.Add(kpiComp, 3, 0);
 
-        // === SplitContainer ===
-        var splitRes = new SplitContainer
+        // === Grid Container ===
+        var pnlGrid = new Panel
         {
             Dock = DockStyle.Fill,
-            SplitterDistance = 650,
-            Orientation = Orientation.Vertical,
             BackColor = AppColors.Surface,
             Padding = new Padding(12, 8, 12, 12)
         };
 
-        // Left: Grid + action buttons
         lblResStatus = new Label
         {
             Text = "",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Tertiary,
-            Location = new Point(0, 0),
-            AutoSize = true
+            Dock = DockStyle.Top,
+            Height = 22,
+            TextAlign = ContentAlignment.MiddleLeft
         };
-        splitRes.Panel1.Controls.Add(lblResStatus);
 
         dgvReservations = new DataGridView
         {
-            Location = new Point(0, 22),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+            Dock = DockStyle.Fill,
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
@@ -646,15 +648,17 @@ partial class MainForm
         dgvReservations.Columns.Add("Room", "Room #");
         dgvReservations.Columns.Add("Guest", "Guest");
         dgvReservations.Columns.Add("Phone", "Phone");
+        dgvReservations.Columns.Add("Passport", "Passport");
+        dgvReservations.Columns.Add("Party", "Party");
         dgvReservations.Columns.Add("CheckIn", "Check In");
         dgvReservations.Columns.Add("CheckOut", "Check Out");
         dgvReservations.Columns.Add("Status", "Status");
         dgvReservations.SelectionChanged += DgvReservations_SelectionChanged;
 
-        // Paint status badges
+        var statusColumnIndex = dgvReservations.Columns.Count - 1;
         dgvReservations.CellPainting += (s, e) =>
         {
-            if (e.ColumnIndex == 5 && e.RowIndex >= 0 && e.Value != null)
+            if (e.ColumnIndex == statusColumnIndex && e.RowIndex >= 0 && e.Value != null)
             {
                 e.Handled = true;
                 e.PaintBackground(e.CellBounds, true);
@@ -672,19 +676,15 @@ partial class MainForm
             }
         };
 
-        splitRes.Panel1.Controls.Add(dgvReservations);
-        splitRes.Panel1.Resize += (s, e) =>
-        {
-            dgvReservations.Size = new Size(splitRes.Panel1.Width, splitRes.Panel1.Height - 70);
-        };
-
         // Action buttons panel
         var pnlResActions = new FlowLayoutPanel
         {
             Dock = DockStyle.Bottom,
-            Height = 44,
+            Height = 48,
             FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false
+            WrapContents = false,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(0, 8, 0, 0)
         };
 
         btnCheckIn = new Button
@@ -732,95 +732,14 @@ partial class MainForm
         btnCancelRes.Click += BtnCancelRes_Click;
 
         pnlResActions.Controls.AddRange(new Control[] { btnCheckIn, btnCheckOut, btnCancelRes });
-        splitRes.Panel1.Controls.Add(pnlResActions);
 
-        // Right: New Reservation card (painted)
-        var pnlNewResCard = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Color.Transparent,
-            Padding = new Padding(8)
-        };
-        pnlNewResCard.Paint += DrawingUtilities.PaintCardBackground;
-
-        var lblNewResTitle = new Label
-        {
-            Text = "NEW RESERVATION",
-            Font = new Font("Segoe UI", 12, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
-            AutoSize = true,
-            Location = new Point(20, 16)
-        };
-        pnlNewResCard.Controls.Add(lblNewResTitle);
-
-        var lblPhone = new Label { Text = "Phone:", Font = new Font("Segoe UI", 10), Location = new Point(20, 52), AutoSize = true };
-        txtPhone = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(20, 74), Size = new Size(150, 28) };
-        btnLookup = new Button
-        {
-            Text = "Lookup",
-            Font = new Font("Segoe UI", 9, FontStyle.Bold),
-            BackColor = AppColors.Primary,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(80, 28),
-            Location = new Point(180, 74),
-            Cursor = Cursors.Hand
-        };
-        btnLookup.FlatAppearance.BorderSize = 0;
-        btnLookup.Click += BtnLookup_Click;
-
-        lblGuestStatus = new Label
-        {
-            Text = "",
-            Font = new Font("Segoe UI", 9),
-            ForeColor = AppColors.Gray500,
-            Location = new Point(20, 108),
-            AutoSize = true
-        };
-
-        var lblName = new Label { Text = "Guest Name:", Font = new Font("Segoe UI", 10), Location = new Point(20, 130), AutoSize = true };
-        txtGuestName = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(20, 152), Size = new Size(240, 28), Visible = false };
-
-        var lblRoom2 = new Label { Text = "Room:", Font = new Font("Segoe UI", 10), Location = new Point(20, 190), AutoSize = true };
-        cmbRoom = new ComboBox
-        {
-            Font = new Font("Segoe UI", 10),
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(20, 212),
-            Size = new Size(240, 28)
-        };
-
-        var lblCI = new Label { Text = "Check In:", Font = new Font("Segoe UI", 10), Location = new Point(20, 252), AutoSize = true };
-        dtpCheckIn = new DateTimePicker { Font = new Font("Segoe UI", 10), Location = new Point(20, 274), Size = new Size(240, 28), Format = DateTimePickerFormat.Short };
-
-        var lblCO = new Label { Text = "Check Out:", Font = new Font("Segoe UI", 10), Location = new Point(20, 312), AutoSize = true };
-        dtpCheckOut = new DateTimePicker { Font = new Font("Segoe UI", 10), Location = new Point(20, 334), Size = new Size(240, 28), Format = DateTimePickerFormat.Short, Value = DateTime.Today.AddDays(1) };
-
-        btnCreateRes = new Button
-        {
-            Text = "Create Reservation",
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            BackColor = AppColors.Accent,
-            ForeColor = AppColors.Primary,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(240, 40),
-            Location = new Point(20, 380),
-            Cursor = Cursors.Hand
-        };
-        btnCreateRes.FlatAppearance.BorderSize = 0;
-        btnCreateRes.Click += BtnCreateRes_Click;
-
-        pnlNewResCard.Controls.AddRange(new Control[] {
-            lblPhone, txtPhone, btnLookup, lblGuestStatus,
-            lblName, txtGuestName,
-            lblRoom2, cmbRoom,
-            lblCI, dtpCheckIn, lblCO, dtpCheckOut,
-            btnCreateRes
-        });
-        splitRes.Panel2.Controls.Add(pnlNewResCard);
+        // Order matters: Fill must be added last so it gets the remaining space
+        pnlGrid.Controls.Add(dgvReservations);
+        pnlGrid.Controls.Add(pnlResActions);
+        pnlGrid.Controls.Add(lblResStatus);
 
         // Add in reverse dock order
-        tabReservations.Controls.Add(splitRes);
+        tabReservations.Controls.Add(pnlGrid);
         tabReservations.Controls.Add(tblResKPI);
         tabReservations.Controls.Add(pnlResHeader);
     }
@@ -1151,33 +1070,6 @@ partial class MainForm
         };
         pnlRestHeader.Controls.Add(lblRestTitle);
 
-        cmbOrderFilter = new ComboBox
-        {
-            Font = new Font("Segoe UI", 10),
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Size = new Size(130, 28),
-            Anchor = AnchorStyles.Top | AnchorStyles.Right
-        };
-        cmbOrderFilter.Items.AddRange(new object[] { "All", "Placed", "Preparing", "Ready", "Served", "Cancelled" });
-        cmbOrderFilter.SelectedIndex = 0;
-        cmbOrderFilter.SelectedIndexChanged += CmbOrderFilter_Changed;
-        pnlRestHeader.Controls.Add(cmbOrderFilter);
-
-        var lblOrdFilterLbl = new Label
-        {
-            Text = "Status:",
-            Font = new Font("Segoe UI", 10),
-            ForeColor = Color.FromArgb(180, 255, 255, 255),
-            AutoSize = true,
-            Anchor = AnchorStyles.Top | AnchorStyles.Right
-        };
-        pnlRestHeader.Controls.Add(lblOrdFilterLbl);
-        pnlRestHeader.Resize += (s, e) =>
-        {
-            cmbOrderFilter.Location = new Point(pnlRestHeader.Width - cmbOrderFilter.Width - 20, 14);
-            lblOrdFilterLbl.Location = new Point(pnlRestHeader.Width - cmbOrderFilter.Width - 70, 18);
-        };
-
         // === KPI Row ===
         var tblRestKPI = new TableLayoutPanel
         {
@@ -1204,233 +1096,68 @@ partial class MainForm
         tblRestKPI.Controls.Add(kpiRevenue, 2, 0);
         tblRestKPI.Controls.Add(kpiItems, 3, 0);
 
-        // === SplitContainer ===
-        var splitRest = new SplitContainer
+        // === Nested sub-tabs ===
+        restSubTabs = new TabControl
         {
             Dock = DockStyle.Fill,
-            SplitterDistance = 520,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            Padding = new Point(16, 8)
+        };
+        subTabOrder = new TabPage("Place Orders") { BackColor = AppColors.Surface, Padding = new Padding(12, 8, 12, 12) };
+        subTabActive = new TabPage("Active Orders") { BackColor = AppColors.Surface, Padding = new Padding(12, 8, 12, 12) };
+        restSubTabs.TabPages.Add(subTabOrder);
+        restSubTabs.TabPages.Add(subTabActive);
+
+        BuildPlaceOrdersSubTab(subTabOrder);
+        BuildActiveOrdersSubTab(subTabActive);
+
+        // Add to tab in reverse dock order
+        tabRestaurant.Controls.Add(restSubTabs);
+        tabRestaurant.Controls.Add(tblRestKPI);
+        tabRestaurant.Controls.Add(pnlRestHeader);
+    }
+
+    private void BuildPlaceOrdersSubTab(TabPage tab)
+    {
+        // SplitContainer: left = categories + card grid + menu mgmt; right = order builder
+        var split = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            SplitterDistance = 700,
             Orientation = Orientation.Vertical,
-            BackColor = AppColors.Surface,
-            Padding = new Padding(12, 8, 12, 12)
+            BackColor = AppColors.Surface
         };
 
-        // ========== LEFT PANEL: Menu + Order Building ==========
-
-        // Category filter tabs
+        // --- Left: categories + cards + menu management ---
         flpCategoryTabs = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 36,
+            Height = 40,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
             AutoScroll = true,
             BackColor = Color.Transparent,
-            Padding = new Padding(0, 2, 0, 2)
+            Padding = new Padding(0, 4, 0, 4)
         };
 
-        // Menu DataGridView
-        dgvMenu = new DataGridView
-        {
-            Dock = DockStyle.Top,
-            Height = 180,
-            ReadOnly = true,
-            AllowUserToAddRows = false,
-            AllowUserToDeleteRows = false,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            BackgroundColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            RowHeadersVisible = false,
-            Font = new Font("Segoe UI", 10),
-            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(245, 248, 255) }
-        };
-        dgvMenu.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
-        dgvMenu.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-        dgvMenu.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
-        dgvMenu.EnableHeadersVisualStyles = false;
-        dgvMenu.Columns.Add("Name", "Name");
-        dgvMenu.Columns.Add("Category", "Category");
-        dgvMenu.Columns.Add("Price", "Price");
-        dgvMenu.Columns.Add("Available", "Available");
-        dgvMenu.Columns["Available"].Width = 80;
-
-        // Paint availability badge
-        dgvMenu.CellPainting += (s, e) =>
-        {
-            if (e.ColumnIndex == 3 && e.RowIndex >= 0 && e.Value != null)
-            {
-                e.Handled = true;
-                e.PaintBackground(e.CellBounds, true);
-                var text = e.Value.ToString()!;
-                var color = text == "Yes" ? AppColors.Tertiary : AppColors.StatusOOS;
-                var badgeRect = new Rectangle(e.CellBounds.X + 6, e.CellBounds.Y + 6,
-                    e.CellBounds.Width - 12, e.CellBounds.Height - 12);
-                using var brush = new SolidBrush(color);
-                e.Graphics!.FillRectangle(brush, badgeRect);
-                TextRenderer.DrawText(e.Graphics, text, new Font("Segoe UI", 8, FontStyle.Bold),
-                    badgeRect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-            }
-        };
-
-        // New Order Card (painted)
-        var pnlNewOrderCard = new Panel
+        flpMenuCards = new FlowLayoutPanel
         {
             Dock = DockStyle.Fill,
-            BackColor = Color.Transparent,
-            Padding = new Padding(8)
-        };
-        pnlNewOrderCard.Paint += DrawingUtilities.PaintCardBackground;
-
-        var lblNewOrderTitle = new Label
-        {
-            Text = "NEW ORDER",
-            Font = new Font("Segoe UI", 12, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
-            AutoSize = true,
-            Location = new Point(16, 10)
-        };
-        pnlNewOrderCard.Controls.Add(lblNewOrderTitle);
-
-        var lblStay2 = new Label { Text = "Stay:", Font = new Font("Segoe UI", 10), Location = new Point(16, 38), AutoSize = true };
-        cmbStay = new ComboBox
-        {
-            Font = new Font("Segoe UI", 10),
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(60, 35),
-            Size = new Size(300, 28)
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = true,
+            AutoScroll = true,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(0, 8, 0, 8)
         };
 
-        var lblItem = new Label { Text = "Item:", Font = new Font("Segoe UI", 10), Location = new Point(16, 70), AutoSize = true };
-        cmbMenuItem = new ComboBox
-        {
-            Font = new Font("Segoe UI", 10),
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(60, 67),
-            Size = new Size(200, 28)
-        };
-
-        var lblQty = new Label { Text = "Qty:", Font = new Font("Segoe UI", 10), Location = new Point(270, 70), AutoSize = true };
-        nudQty = new NumericUpDown
-        {
-            Font = new Font("Segoe UI", 10),
-            Location = new Point(305, 67),
-            Size = new Size(55, 28),
-            Minimum = 1,
-            Maximum = 20,
-            Value = 1
-        };
-
-        var lblNotes = new Label { Text = "Notes:", Font = new Font("Segoe UI", 10), Location = new Point(16, 102), AutoSize = true };
-        txtLineNotes = new TextBox
-        {
-            Font = new Font("Segoe UI", 10),
-            Location = new Point(70, 99),
-            Size = new Size(220, 28)
-        };
-
-        btnAddLine = new Button
-        {
-            Text = "Add Item",
-            Font = new Font("Segoe UI", 9, FontStyle.Bold),
-            BackColor = AppColors.Tertiary,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(80, 28),
-            Location = new Point(300, 99),
-            Cursor = Cursors.Hand
-        };
-        btnAddLine.FlatAppearance.BorderSize = 0;
-        btnAddLine.Click += BtnAddLine_Click;
-
-        // Current order lines grid (replaces ListBox)
-        dgvCurrentOrderLines = new DataGridView
-        {
-            Location = new Point(16, 135),
-            Size = new Size(365, 120),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
-            ReadOnly = true,
-            AllowUserToAddRows = false,
-            AllowUserToDeleteRows = false,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            BackgroundColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            RowHeadersVisible = false,
-            Font = new Font("Segoe UI", 9)
-        };
-        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
-        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-        dgvCurrentOrderLines.EnableHeadersVisualStyles = false;
-        dgvCurrentOrderLines.Columns.Add("Item", "Item");
-        dgvCurrentOrderLines.Columns.Add("Qty", "Qty");
-        dgvCurrentOrderLines.Columns["Qty"].Width = 40;
-        dgvCurrentOrderLines.Columns.Add("Notes", "Notes");
-        dgvCurrentOrderLines.Columns.Add("Total", "Total");
-        dgvCurrentOrderLines.Columns["Total"].Width = 60;
-        var removeCol = new DataGridViewButtonColumn
-        {
-            Name = "Remove",
-            Text = "X",
-            UseColumnTextForButtonValue = true,
-            Width = 30,
-            FlatStyle = FlatStyle.Flat
-        };
-        dgvCurrentOrderLines.Columns.Add(removeCol);
-        dgvCurrentOrderLines.CellClick += DgvCurrentOrderLines_CellClick;
-
-        lblRunningTotal = new Label
-        {
-            Text = "Total: $0.00",
-            Font = new Font("Segoe UI", 11, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
-            AutoSize = true,
-            Location = new Point(16, 262)
-        };
-
-        btnPlaceOrder = new Button
-        {
-            Text = "Place Order",
-            Font = new Font("Segoe UI", 10, FontStyle.Bold),
-            BackColor = AppColors.Accent,
-            ForeColor = AppColors.Primary,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(130, 34),
-            Location = new Point(16, 288),
-            Cursor = Cursors.Hand
-        };
-        btnPlaceOrder.FlatAppearance.BorderSize = 0;
-        btnPlaceOrder.Click += BtnPlaceOrder_Click;
-
-        btnClearOrder = new Button
-        {
-            Text = "Clear",
-            Font = new Font("Segoe UI", 10, FontStyle.Bold),
-            BackColor = AppColors.Gray400,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(80, 34),
-            Location = new Point(155, 288),
-            Cursor = Cursors.Hand
-        };
-        btnClearOrder.FlatAppearance.BorderSize = 0;
-        btnClearOrder.Click += BtnClearOrder_Click;
-
-        pnlNewOrderCard.Controls.AddRange(new Control[] {
-            lblStay2, cmbStay, lblItem, cmbMenuItem,
-            lblQty, nudQty, lblNotes, txtLineNotes,
-            btnAddLine, dgvCurrentOrderLines, lblRunningTotal,
-            btnPlaceOrder, btnClearOrder
-        });
-
-        // Manager-only menu management buttons
+        // Menu management buttons (manager-only, kept in same spot at bottom)
         var pnlMenuActions = new FlowLayoutPanel
         {
             Dock = DockStyle.Bottom,
-            Height = 40,
+            Height = 44,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            Padding = new Padding(0, 4, 0, 0)
+            Padding = new Padding(0, 6, 0, 0)
         };
 
         btnAddMenuItem = new Button
@@ -1490,19 +1217,168 @@ partial class MainForm
 
         pnlMenuActions.Controls.AddRange(new Control[] { btnAddMenuItem, btnEditMenuItem, btnToggleAvail, btnRemoveMenuItem });
 
-        // Assemble left panel (reverse dock order)
-        splitRest.Panel1.Controls.Add(pnlNewOrderCard);  // Fill
-        splitRest.Panel1.Controls.Add(pnlMenuActions);    // Bottom
-        splitRest.Panel1.Controls.Add(dgvMenu);           // Top (below categories)
-        splitRest.Panel1.Controls.Add(flpCategoryTabs);   // Top
+        // Order matters: Fill must be added LAST so it gets remaining space
+        split.Panel1.Controls.Add(flpMenuCards);
+        split.Panel1.Controls.Add(pnlMenuActions);
+        split.Panel1.Controls.Add(flpCategoryTabs);
 
-        // ========== RIGHT PANEL: Orders + Detail ==========
+        // --- Right: order builder card ---
+        var pnlNewOrderCard = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = Color.Transparent,
+            Padding = new Padding(8)
+        };
+        pnlNewOrderCard.Paint += DrawingUtilities.PaintCardBackground;
 
-        // Orders grid (top area)
-        dgvOrders = new DataGridView
+        var lblNewOrderTitle = new Label
+        {
+            Text = "NEW ORDER",
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            AutoSize = true,
+            Location = new Point(16, 12)
+        };
+
+        var lblStay2 = new Label { Text = "Stay:", Font = new Font("Segoe UI", 10), Location = new Point(16, 44), AutoSize = true };
+        cmbStay = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(60, 41),
+            Size = new Size(300, 28),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+
+        dgvCurrentOrderLines = new DataGridView
+        {
+            Location = new Point(16, 84),
+            Size = new Size(344, 280),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            RowHeadersVisible = false,
+            Font = new Font("Segoe UI", 9)
+        };
+        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
+        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+        dgvCurrentOrderLines.EnableHeadersVisualStyles = false;
+        dgvCurrentOrderLines.Columns.Add("Item", "Item");
+        dgvCurrentOrderLines.Columns.Add("Qty", "Qty");
+        dgvCurrentOrderLines.Columns["Qty"].Width = 40;
+        dgvCurrentOrderLines.Columns.Add("Total", "Total");
+        dgvCurrentOrderLines.Columns["Total"].Width = 70;
+        var removeCol = new DataGridViewButtonColumn
+        {
+            Name = "Remove",
+            Text = "X",
+            UseColumnTextForButtonValue = true,
+            Width = 30,
+            FlatStyle = FlatStyle.Flat
+        };
+        dgvCurrentOrderLines.Columns.Add(removeCol);
+        dgvCurrentOrderLines.CellClick += DgvCurrentOrderLines_CellClick;
+
+        lblRunningTotal = new Label
+        {
+            Text = "Total: $0.00",
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            AutoSize = true,
+            Location = new Point(16, 374),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+
+        btnPlaceOrder = new Button
+        {
+            Text = "Place Order",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(140, 36),
+            Location = new Point(16, 402),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+        btnPlaceOrder.FlatAppearance.BorderSize = 0;
+        btnPlaceOrder.Click += BtnPlaceOrder_Click;
+
+        btnClearOrder = new Button
+        {
+            Text = "Clear",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Gray400,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(80, 36),
+            Location = new Point(162, 402),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+        btnClearOrder.FlatAppearance.BorderSize = 0;
+        btnClearOrder.Click += BtnClearOrder_Click;
+
+        pnlNewOrderCard.Controls.AddRange(new Control[] {
+            lblNewOrderTitle, lblStay2, cmbStay,
+            dgvCurrentOrderLines, lblRunningTotal,
+            btnPlaceOrder, btnClearOrder
+        });
+
+        split.Panel2.Controls.Add(pnlNewOrderCard);
+
+        tab.Controls.Add(split);
+    }
+
+    private void BuildActiveOrdersSubTab(TabPage tab)
+    {
+        var split = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            SplitterDistance = 520,
+            Orientation = Orientation.Vertical,
+            BackColor = AppColors.Surface
+        };
+
+        // --- Left: filter + orders grid ---
+        var pnlOrdersLeft = new Panel { Dock = DockStyle.Fill, BackColor = AppColors.Surface };
+
+        var pnlFilterRow = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 200,
+            Height = 40,
+            BackColor = AppColors.Surface
+        };
+        var lblOrdFilterLbl = new Label
+        {
+            Text = "Status:",
+            Font = new Font("Segoe UI", 10),
+            ForeColor = AppColors.Gray700,
+            AutoSize = true,
+            Location = new Point(0, 10)
+        };
+        cmbOrderFilter = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Size = new Size(150, 28),
+            Location = new Point(54, 6)
+        };
+        cmbOrderFilter.Items.AddRange(new object[] { "All", "Placed", "Preparing", "Ready", "Served", "Cancelled" });
+        cmbOrderFilter.SelectedIndex = 0;
+        cmbOrderFilter.SelectedIndexChanged += CmbOrderFilter_Changed;
+        pnlFilterRow.Controls.Add(lblOrdFilterLbl);
+        pnlFilterRow.Controls.Add(cmbOrderFilter);
+
+        dgvOrders = new DataGridView
+        {
+            Dock = DockStyle.Fill,
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
@@ -1529,7 +1405,6 @@ partial class MainForm
         dgvOrders.Columns["Status"].Width = 80;
         dgvOrders.SelectionChanged += DgvOrders_SelectionChanged;
 
-        // Paint status badges in orders grid
         dgvOrders.CellPainting += (s, e) =>
         {
             if (e.ColumnIndex == 4 && e.RowIndex >= 0 && e.Value != null)
@@ -1550,7 +1425,11 @@ partial class MainForm
             }
         };
 
-        // Order detail panel
+        pnlOrdersLeft.Controls.Add(dgvOrders);
+        pnlOrdersLeft.Controls.Add(pnlFilterRow);
+        split.Panel1.Controls.Add(pnlOrdersLeft);
+
+        // --- Right: detail panel + action buttons ---
         pnlOrderDetail = new Panel
         {
             Dock = DockStyle.Fill,
@@ -1581,7 +1460,6 @@ partial class MainForm
             Visible = false
         };
 
-        // Status progression bar
         pnlStatusProgression = new Panel
         {
             Location = new Point(16, 64),
@@ -1591,7 +1469,6 @@ partial class MainForm
         };
         pnlStatusProgression.Paint += PaintStatusProgression;
 
-        // Order lines grid (read-only detail)
         dgvOrderLines = new DataGridView
         {
             Location = new Point(16, 100),
@@ -1634,14 +1511,13 @@ partial class MainForm
             pnlStatusProgression, dgvOrderLines, lblOrderTotal
         });
 
-        // Order action buttons
         var pnlOrderActions = new FlowLayoutPanel
         {
             Dock = DockStyle.Bottom,
-            Height = 44,
+            Height = 48,
             FlowDirection = FlowDirection.LeftToRight,
             WrapContents = false,
-            Padding = new Padding(0, 4, 0, 0)
+            Padding = new Padding(0, 6, 0, 0)
         };
 
         btnAdvanceOrder = new Button
@@ -1690,15 +1566,10 @@ partial class MainForm
 
         pnlOrderActions.Controls.AddRange(new Control[] { btnAdvanceOrder, btnAddItemsToOrder, btnCancelOrder });
 
-        // Assemble right panel (reverse dock order)
-        splitRest.Panel2.Controls.Add(pnlOrderDetail);    // Fill
-        splitRest.Panel2.Controls.Add(pnlOrderActions);   // Bottom
-        splitRest.Panel2.Controls.Add(dgvOrders);          // Top
+        split.Panel2.Controls.Add(pnlOrderDetail);
+        split.Panel2.Controls.Add(pnlOrderActions);
 
-        // Add to tab in reverse dock order
-        tabRestaurant.Controls.Add(splitRest);
-        tabRestaurant.Controls.Add(tblRestKPI);
-        tabRestaurant.Controls.Add(pnlRestHeader);
+        tab.Controls.Add(split);
     }
 
     private void InitFinancesTab()

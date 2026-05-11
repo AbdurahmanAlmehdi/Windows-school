@@ -29,22 +29,23 @@ public class RoomService
         room.MaintenanceLog = reason;
     }
 
-    public Room AddRoom(int number, RoomType type, decimal rate)
+    public Room AddRoom(int number, int floor, RoomType type, decimal rate)
     {
         if (_store.Rooms.Any(r => r.Number == number))
             throw new InvalidOperationException($"Room {number} already exists.");
 
-        var room = new Room { Number = number, Type = type, Rate = rate };
+        var room = new Room { Number = number, Floor = floor, Type = type, Rate = rate };
         _store.Rooms.Add(room);
         return room;
     }
 
-    public void UpdateRoom(Room room, int number, RoomType type, decimal rate)
+    public void UpdateRoom(Room room, int number, int floor, RoomType type, decimal rate)
     {
         if (_store.Rooms.Any(r => r.Number == number && r != room))
             throw new InvalidOperationException($"Room {number} already exists.");
 
         room.Number = number;
+        room.Floor = floor;
         room.Type = type;
         room.Rate = rate;
     }

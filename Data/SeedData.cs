@@ -4,30 +4,33 @@ namespace HotelManagement.WinForms.Data;
 
 public static class SeedData
 {
+    private static readonly string MenuPlaceholder =
+        Path.Combine(AppContext.BaseDirectory, "Assets", "menu_placeholder.jpg");
+
     public static void Populate(DataStore store)
     {
         // Users
         store.Users.Add(new User { Username = "admin", Password = "admin123", Role = UserRole.Manager });
         store.Users.Add(new User { Username = "staff", Password = "staff123", Role = UserRole.Staff });
 
-        // Rooms
-        store.Rooms.Add(new Room { Number = 101, Type = RoomType.Single, Rate = 99.99m });
-        store.Rooms.Add(new Room { Number = 102, Type = RoomType.Single, Rate = 99.99m });
-        store.Rooms.Add(new Room { Number = 201, Type = RoomType.Double, Rate = 149.99m, IsOccupied = true });
-        store.Rooms.Add(new Room { Number = 202, Type = RoomType.Double, Rate = 149.99m });
-        store.Rooms.Add(new Room { Number = 301, Type = RoomType.Suite, Rate = 249.99m, IsOccupied = true });
-        store.Rooms.Add(new Room { Number = 302, Type = RoomType.Suite, Rate = 249.99m, Condition = RoomCondition.NeedsCleaning });
-        store.Rooms.Add(new Room { Number = 401, Type = RoomType.Deluxe, Rate = 349.99m });
-        store.Rooms.Add(new Room { Number = 402, Type = RoomType.Deluxe, Rate = 349.99m });
-        store.Rooms.Add(new Room { Number = 501, Type = RoomType.Penthouse, Rate = 599.99m, Condition = RoomCondition.OutOfService, MaintenanceLog = "Plumbing repair scheduled" });
-        store.Rooms.Add(new Room { Number = 502, Type = RoomType.Penthouse, Rate = 599.99m });
+        // Rooms (floor derived from first digit of room number)
+        store.Rooms.Add(new Room { Number = 101, Floor = 1, Type = RoomType.Single, Rate = 99.99m });
+        store.Rooms.Add(new Room { Number = 102, Floor = 1, Type = RoomType.Single, Rate = 99.99m });
+        store.Rooms.Add(new Room { Number = 201, Floor = 2, Type = RoomType.Double, Rate = 149.99m, IsOccupied = true });
+        store.Rooms.Add(new Room { Number = 202, Floor = 2, Type = RoomType.Double, Rate = 149.99m });
+        store.Rooms.Add(new Room { Number = 301, Floor = 3, Type = RoomType.Suite, Rate = 249.99m, IsOccupied = true });
+        store.Rooms.Add(new Room { Number = 302, Floor = 3, Type = RoomType.Suite, Rate = 249.99m, Condition = RoomCondition.NeedsCleaning });
+        store.Rooms.Add(new Room { Number = 401, Floor = 4, Type = RoomType.Deluxe, Rate = 349.99m });
+        store.Rooms.Add(new Room { Number = 402, Floor = 4, Type = RoomType.Deluxe, Rate = 349.99m });
+        store.Rooms.Add(new Room { Number = 501, Floor = 5, Type = RoomType.Penthouse, Rate = 599.99m, Condition = RoomCondition.OutOfService, MaintenanceLog = "Plumbing repair scheduled" });
+        store.Rooms.Add(new Room { Number = 502, Floor = 5, Type = RoomType.Penthouse, Rate = 599.99m });
 
         // Guests
-        var guest1 = new Guest { Name = "John Smith", Contact = "555-0101", IsVip = true, StayCount = 5 };
-        var guest2 = new Guest { Name = "Jane Doe", Contact = "555-0102", IsVip = false, StayCount = 2 };
-        var guest3 = new Guest { Name = "Bob Johnson", Contact = "555-0103", IsVip = false, StayCount = 1 };
-        var guest4 = new Guest { Name = "Alice Williams", Contact = "555-0104", IsVip = true, StayCount = 8 };
-        var guest5 = new Guest { Name = "Charlie Brown", Contact = "555-0105", IsVip = false, StayCount = 0 };
+        var guest1 = new Guest { Name = "John Smith",     Contact = "555-0101", Passport = "P10000001", Gender = Gender.Male,   IsVip = true,  StayCount = 5 };
+        var guest2 = new Guest { Name = "Jane Doe",       Contact = "555-0102", Passport = "P10000002", Gender = Gender.Female, IsVip = false, StayCount = 2 };
+        var guest3 = new Guest { Name = "Bob Johnson",    Contact = "555-0103", Passport = "P10000003", Gender = Gender.Male,   IsVip = false, StayCount = 1 };
+        var guest4 = new Guest { Name = "Alice Williams", Contact = "555-0104", Passport = "P10000004", Gender = Gender.Female, IsVip = true,  StayCount = 8 };
+        var guest5 = new Guest { Name = "Charlie Brown",  Contact = "555-0105", Passport = "P10000005", Gender = Gender.Male,   IsVip = false, StayCount = 0 };
         store.Guests.Add(guest1);
         store.Guests.Add(guest2);
         store.Guests.Add(guest3);
@@ -57,7 +60,11 @@ public static class SeedData
             Room = store.Rooms[0], // 101
             CheckInDate = DateTime.Today,
             CheckOutDate = DateTime.Today.AddDays(2),
-            Status = ReservationStatus.Confirmed
+            Status = ReservationStatus.Confirmed,
+            Accompanying = new List<AccompanyingGuest>
+            {
+                new() { Name = "Lily Doe", Gender = Gender.Female, Age = 9, Passport = "P10000201" }
+            }
         });
 
         // Active Stays
@@ -82,22 +89,22 @@ public static class SeedData
         store.Stays.Add(stay1);
         store.Stays.Add(stay2);
 
-        // Menu Items
-        store.MenuItems.Add(new MenuItem { Name = "Caesar Salad", Price = 12.99m, Category = "Starters" });
-        store.MenuItems.Add(new MenuItem { Name = "Tomato Soup", Price = 8.99m, Category = "Starters" });
-        store.MenuItems.Add(new MenuItem { Name = "Grilled Salmon", Price = 24.99m, Category = "Main Course" });
-        store.MenuItems.Add(new MenuItem { Name = "Beef Steak", Price = 32.99m, Category = "Main Course" });
-        store.MenuItems.Add(new MenuItem { Name = "Chicken Pasta", Price = 18.99m, Category = "Main Course" });
-        store.MenuItems.Add(new MenuItem { Name = "Margherita Pizza", Price = 15.99m, Category = "Main Course" });
-        store.MenuItems.Add(new MenuItem { Name = "Chocolate Cake", Price = 9.99m, Category = "Desserts" });
-        store.MenuItems.Add(new MenuItem { Name = "Ice Cream Sundae", Price = 7.99m, Category = "Desserts" });
-        store.MenuItems.Add(new MenuItem { Name = "Tiramisu", Price = 10.99m, Category = "Desserts" });
-        store.MenuItems.Add(new MenuItem { Name = "Fresh Orange Juice", Price = 5.99m, Category = "Beverages" });
-        store.MenuItems.Add(new MenuItem { Name = "Espresso", Price = 3.99m, Category = "Beverages" });
-        store.MenuItems.Add(new MenuItem { Name = "Cappuccino", Price = 4.99m, Category = "Beverages" });
-        store.MenuItems.Add(new MenuItem { Name = "Mineral Water", Price = 2.99m, Category = "Beverages" });
-        store.MenuItems.Add(new MenuItem { Name = "Club Sandwich", Price = 14.99m, Category = "Snacks" });
-        store.MenuItems.Add(new MenuItem { Name = "French Fries", Price = 6.99m, Category = "Snacks" });
+        // Menu Items (every item points to the shared placeholder image until a manager uploads one)
+        store.MenuItems.Add(new MenuItem { Name = "Caesar Salad",       Price = 12.99m, Category = "Starters",    ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Tomato Soup",        Price =  8.99m, Category = "Starters",    ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Grilled Salmon",     Price = 24.99m, Category = "Main Course", ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Beef Steak",         Price = 32.99m, Category = "Main Course", ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Chicken Pasta",      Price = 18.99m, Category = "Main Course", ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Margherita Pizza",   Price = 15.99m, Category = "Main Course", ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Chocolate Cake",     Price =  9.99m, Category = "Desserts",    ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Ice Cream Sundae",   Price =  7.99m, Category = "Desserts",    ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Tiramisu",           Price = 10.99m, Category = "Desserts",    ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Fresh Orange Juice", Price =  5.99m, Category = "Beverages",   ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Espresso",           Price =  3.99m, Category = "Beverages",   ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Cappuccino",         Price =  4.99m, Category = "Beverages",   ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Mineral Water",      Price =  2.99m, Category = "Beverages",   ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "Club Sandwich",      Price = 14.99m, Category = "Snacks",      ImagePath = MenuPlaceholder });
+        store.MenuItems.Add(new MenuItem { Name = "French Fries",       Price =  6.99m, Category = "Snacks",      ImagePath = MenuPlaceholder });
 
         // Sample order for stay1
         var order = new RestaurantOrder { Stay = stay1, Status = OrderStatus.Served };
@@ -109,7 +116,7 @@ public static class SeedData
         // --- Sample Invoices ---
 
         // Past guest with completed stay and paid invoice
-        var guest6 = new Guest { Name = "Diana Prince", Contact = "555-0106", IsVip = false, StayCount = 1 };
+        var guest6 = new Guest { Name = "Diana Prince", Contact = "555-0106", Passport = "P10000006", Gender = Gender.Female, IsVip = false, StayCount = 1 };
         store.Guests.Add(guest6);
 
         var pastStay = new Stay

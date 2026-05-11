@@ -16,8 +16,8 @@ public partial class MainForm : Form
     private readonly InvoiceService _invoiceService;
     private readonly DataStore _store;
 
-    private Guest? _lookedUpGuest;
     private Room? _selectedRoom;
+    private Models.MenuItem? _selectedMenuItem;
     private readonly BindingList<OrderLine> _currentOrderLines = new();
 
     public MainForm(
@@ -38,6 +38,8 @@ public partial class MainForm : Form
         _store = dataStore;
 
         InitializeComponent();
+
+        WindowState = FormWindowState.Maximized;
 
         // Position logout button
         btnLogout.Location = new Point(panelHeader.Width - btnLogout.Width - 12, 8);
@@ -498,10 +500,15 @@ public partial class MainForm : Form
         dgvReservations.Rows.Clear();
         foreach (var r in _filteredReservations)
         {
+            var partyText = r.ChildCount > 0
+                ? $"{r.AdultCount}A + {r.ChildCount}C"
+                : $"{r.AdultCount}A";
             dgvReservations.Rows.Add(
                 r.Room.Number,
                 r.Guest.Name,
                 r.Guest.Contact,
+                string.IsNullOrEmpty(r.Guest.Passport) ? "—" : r.Guest.Passport,
+                partyText,
                 r.CheckInDate.ToShortDateString(),
                 r.CheckOutDate.ToShortDateString(),
                 r.Status.ToString());
@@ -509,7 +516,6 @@ public partial class MainForm : Form
 
         lblResStatus.Text = $"{_filteredReservations.Count} reservation(s)";
         UpdateResButtons();
-        RefreshRoomCombo();
         RefreshResKPIs();
     }
 
@@ -528,15 +534,16 @@ public partial class MainForm : Form
         lblResKpiCompleted.Text = completedToday.ToString();
     }
 
-    private void RefreshRoomCombo()
-    {
-        cmbRoom.Items.Clear();
-        foreach (var room in _roomService.GetAvailableRooms())
-            cmbRoom.Items.Add(room);
-        if (cmbRoom.Items.Count > 0) cmbRoom.SelectedIndex = 0;
-    }
-
     private void CmbResFilter_Changed(object? sender, EventArgs e) => RefreshReservations();
+
+    private void BtnNewReservation_Click(object? sender, EventArgs e)
+    {
+        using var dlg = new ReservationDialog(_store, _roomService, _bookingService);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            RefreshReservations();
+        }
+    }
 
     private void DgvReservations_SelectionChanged(object? sender, EventArgs e) => UpdateResButtons();
 
@@ -608,80 +615,6 @@ public partial class MainForm : Form
             _bookingService.Cancel(res);
             RefreshReservations();
         }
-    }
-
-    private void BtnLookup_Click(object? sender, EventArgs e)
-    {
-        var phone = txtPhone.Text.Trim();
-        if (string.IsNullOrEmpty(phone))
-        {
-            lblGuestStatus.Text = "Enter a phone number.";
-            return;
-        }
-
-        _lookedUpGuest = _store.Guests.FirstOrDefault(g =>
-            g.Contact.Equals(phone, StringComparison.OrdinalIgnoreCase));
-
-        if (_lookedUpGuest != null)
-        {
-            lblGuestStatus.Text = $"Found: {_lookedUpGuest.Name}";
-            lblGuestStatus.ForeColor = AppColors.Tertiary;
-            txtGuestName.Visible = false;
-        }
-        else
-        {
-            lblGuestStatus.Text = "New guest — enter name:";
-            lblGuestStatus.ForeColor = AppColors.StatusClean;
-            txtGuestName.Visible = true;
-            txtGuestName.Focus();
-        }
-    }
-
-    private void BtnCreateRes_Click(object? sender, EventArgs e)
-    {
-        if (_lookedUpGuest == null && string.IsNullOrWhiteSpace(txtGuestName.Text))
-        {
-            MessageBox.Show("Please lookup a guest by phone first.", "Missing Guest",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        if (cmbRoom.SelectedItem is not Room room)
-        {
-            MessageBox.Show("Please select a room.", "Missing Room",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        if (dtpCheckOut.Value.Date <= dtpCheckIn.Value.Date)
-        {
-            MessageBox.Show("Check-out must be after check-in.", "Invalid Dates",
-                MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
-        }
-
-        var guest = _lookedUpGuest;
-        if (guest == null)
-        {
-            guest = new Guest
-            {
-                Name = txtGuestName.Text.Trim(),
-                Contact = txtPhone.Text.Trim()
-            };
-            _store.Guests.Add(guest);
-        }
-
-        _bookingService.CreateReservation(guest, room, dtpCheckIn.Value.Date, dtpCheckOut.Value.Date);
-        MessageBox.Show($"Reservation created for {guest.Name} in Room {room.Number}.",
-            "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
-        // Reset
-        txtPhone.Clear();
-        txtGuestName.Clear();
-        txtGuestName.Visible = false;
-        lblGuestStatus.Text = "";
-        _lookedUpGuest = null;
-        RefreshReservations();
     }
 
     // ===================== ROOMS =====================
@@ -767,7 +700,7 @@ public partial class MainForm : Form
 
         var lblType = new Label
         {
-            Text = room.Type.ToString(),
+            Text = $"{room.Type} · Floor {room.Floor}",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Gray500,
             Location = new Point(10, 42),
@@ -850,7 +783,7 @@ public partial class MainForm : Form
 
         var room = _selectedRoom;
         lblRoomDetailTitle.Text = $"Room {room.Number} - {room.Type}";
-        lblRoomDetailType.Text = $"Type: {room.Type}";
+        lblRoomDetailType.Text = $"Type: {room.Type}  ·  Floor {room.Floor}";
         lblRoomDetailRate.Text = $"${room.Rate:F2}/night";
 
         var displayStatus = room.DisplayStatus;
@@ -954,7 +887,7 @@ public partial class MainForm : Form
         using var dlg = new Form
         {
             Text = existing == null ? "Add Room" : "Edit Room",
-            Size = new Size(340, 260),
+            Size = new Size(360, 300),
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
@@ -973,23 +906,34 @@ public partial class MainForm : Form
             Value = existing?.Number ?? 100
         };
 
-        var lblT = new Label { Text = "Type:", Font = new Font("Segoe UI", 10), Location = new Point(20, 55), AutoSize = true };
+        var lblF = new Label { Text = "Floor:", Font = new Font("Segoe UI", 10), Location = new Point(20, 55), AutoSize = true };
+        var nudFloor = new NumericUpDown
+        {
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(110, 52),
+            Size = new Size(100, 28),
+            Minimum = 0,
+            Maximum = 99,
+            Value = existing?.Floor ?? 1
+        };
+
+        var lblT = new Label { Text = "Type:", Font = new Font("Segoe UI", 10), Location = new Point(20, 90), AutoSize = true };
         var cmbType = new ComboBox
         {
             Font = new Font("Segoe UI", 10),
             DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(110, 52),
-            Size = new Size(180, 28)
+            Location = new Point(110, 87),
+            Size = new Size(200, 28)
         };
         foreach (var rt in Enum.GetValues<RoomType>())
             cmbType.Items.Add(rt);
         cmbType.SelectedItem = existing?.Type ?? RoomType.Single;
 
-        var lblR = new Label { Text = "Rate:", Font = new Font("Segoe UI", 10), Location = new Point(20, 90), AutoSize = true };
+        var lblR = new Label { Text = "Rate:", Font = new Font("Segoe UI", 10), Location = new Point(20, 125), AutoSize = true };
         var txtRate = new TextBox
         {
             Font = new Font("Segoe UI", 10),
-            Location = new Point(110, 87),
+            Location = new Point(110, 122),
             Size = new Size(100, 28),
             Text = existing?.Rate.ToString("F2") ?? "99.99"
         };
@@ -1002,7 +946,7 @@ public partial class MainForm : Form
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(100, 34),
-            Location = new Point(110, 135),
+            Location = new Point(110, 175),
             DialogResult = DialogResult.OK,
             Cursor = Cursors.Hand
         };
@@ -1014,18 +958,19 @@ public partial class MainForm : Form
             Font = new Font("Segoe UI", 10),
             FlatStyle = FlatStyle.Flat,
             Size = new Size(80, 34),
-            Location = new Point(220, 135),
+            Location = new Point(220, 175),
             DialogResult = DialogResult.Cancel,
             Cursor = Cursors.Hand
         };
 
-        dlg.Controls.AddRange(new Control[] { lblN, nudNum, lblT, cmbType, lblR, txtRate, btnOk, btnCancel });
+        dlg.Controls.AddRange(new Control[] { lblN, nudNum, lblF, nudFloor, lblT, cmbType, lblR, txtRate, btnOk, btnCancel });
         dlg.AcceptButton = btnOk;
         dlg.CancelButton = btnCancel;
 
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {
             var number = (int)nudNum.Value;
+            var floor = (int)nudFloor.Value;
             var type = (RoomType)cmbType.SelectedItem!;
             if (!decimal.TryParse(txtRate.Text, out var rate) || rate < 0)
             {
@@ -1036,9 +981,9 @@ public partial class MainForm : Form
             try
             {
                 if (existing == null)
-                    _roomService.AddRoom(number, type, rate);
+                    _roomService.AddRoom(number, floor, type, rate);
                 else
-                    _roomService.UpdateRoom(existing, number, type, rate);
+                    _roomService.UpdateRoom(existing, number, floor, type, rate);
 
                 RefreshRooms();
             }
@@ -1059,7 +1004,7 @@ public partial class MainForm : Form
     {
         RefreshRestKPIs();
         RefreshCategoryTabs();
-        RefreshMenuGrid();
+        RefreshMenuCards();
         RefreshStayCombos();
         RefreshOrdersGrid();
         RefreshOrderDetail();
@@ -1109,18 +1054,157 @@ public partial class MainForm : Form
         if (sender is not Button btn || btn.Tag is not string cat) return;
         _selectedMenuCategory = cat;
         RefreshCategoryTabs();
-        RefreshMenuGrid();
+        RefreshMenuCards();
     }
 
-    private void RefreshMenuGrid()
+    private void RefreshMenuCards()
     {
-        dgvMenu.Rows.Clear();
+        flpMenuCards.SuspendLayout();
+        foreach (Control c in flpMenuCards.Controls)
+        {
+            foreach (Control inner in c.Controls)
+            {
+                if (inner is PictureBox pb) { pb.Image?.Dispose(); pb.Image = null; }
+            }
+        }
+        flpMenuCards.Controls.Clear();
+
         var items = _selectedMenuCategory == "All"
             ? _store.MenuItems.ToList()
             : _store.MenuItems.Where(m => m.Category == _selectedMenuCategory).ToList();
 
         foreach (var item in items)
-            dgvMenu.Rows.Add(item.Name, item.Category, $"${item.Price:F2}", item.IsAvailable ? "Yes" : "No");
+            flpMenuCards.Controls.Add(CreateMenuItemCard(item));
+
+        flpMenuCards.ResumeLayout();
+    }
+
+    private Panel CreateMenuItemCard(Models.MenuItem item)
+    {
+        var card = new Panel
+        {
+            Size = new Size(200, 280),
+            BackColor = Color.White,
+            Margin = new Padding(8),
+            Cursor = Cursors.Hand,
+            Tag = item
+        };
+        card.Paint += (s, e) =>
+        {
+            var selected = _selectedMenuItem == item;
+            using var pen = new Pen(selected ? AppColors.Accent : AppColors.Gray200, selected ? 2 : 1);
+            e.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+        };
+
+        var pic = new PictureBox
+        {
+            Location = new Point(8, 8),
+            Size = new Size(184, 130),
+            BorderStyle = BorderStyle.FixedSingle,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = AppColors.Gray100,
+            Cursor = Cursors.Hand
+        };
+        if (!string.IsNullOrEmpty(item.ImagePath) && File.Exists(item.ImagePath))
+        {
+            try { pic.Image = Image.FromFile(item.ImagePath); } catch { }
+        }
+
+        var lblName = new Label
+        {
+            Text = item.Name,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            Location = new Point(8, 144),
+            Size = new Size(184, 18),
+            AutoEllipsis = true
+        };
+
+        var lblPrice = new Label
+        {
+            Text = $"${item.Price:F2}",
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            ForeColor = AppColors.Accent,
+            Location = new Point(8, 164),
+            AutoSize = true
+        };
+
+        var lblAvail = new Label
+        {
+            Text = item.IsAvailable ? "Available" : "Unavailable",
+            Font = new Font("Segoe UI", 8, FontStyle.Bold),
+            ForeColor = Color.White,
+            BackColor = item.IsAvailable ? AppColors.Tertiary : AppColors.StatusOOS,
+            Location = new Point(90, 166),
+            Size = new Size(100, 18),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        var nudCardQty = new NumericUpDown
+        {
+            Location = new Point(8, 196),
+            Size = new Size(60, 26),
+            Font = new Font("Segoe UI", 9),
+            Minimum = 1,
+            Maximum = 20,
+            Value = 1
+        };
+
+        var btnAdd = new Button
+        {
+            Text = "Add to Order",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = item.IsAvailable ? AppColors.Tertiary : AppColors.Gray300,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(118, 30),
+            Location = new Point(74, 194),
+            Cursor = Cursors.Hand,
+            Enabled = item.IsAvailable
+        };
+        btnAdd.FlatAppearance.BorderSize = 0;
+        btnAdd.Click += (s, e) =>
+        {
+            AddItemToOrder(item, (int)nudCardQty.Value);
+            nudCardQty.Value = 1;
+        };
+
+        card.Controls.Add(pic);
+        card.Controls.Add(lblName);
+        card.Controls.Add(lblPrice);
+        card.Controls.Add(lblAvail);
+        card.Controls.Add(nudCardQty);
+        card.Controls.Add(btnAdd);
+
+        // Card click → select for management actions (don't intercept clicks on the qty/add button)
+        void SelectThis(object? s, EventArgs e) => MenuCard_Click(item);
+        card.Click += SelectThis;
+        pic.Click += SelectThis;
+        lblName.Click += SelectThis;
+        lblPrice.Click += SelectThis;
+        lblAvail.Click += SelectThis;
+
+        return card;
+    }
+
+    private void MenuCard_Click(Models.MenuItem item)
+    {
+        _selectedMenuItem = item;
+        flpMenuCards.Invalidate(true);
+        foreach (Control c in flpMenuCards.Controls) c.Invalidate();
+    }
+
+    private void AddItemToOrder(Models.MenuItem item, int quantity)
+    {
+        var line = new OrderLine
+        {
+            MenuItem = item,
+            Quantity = quantity,
+            Notes = string.Empty
+        };
+        _currentOrderLines.Add(line);
+        dgvCurrentOrderLines.Rows.Add(line.MenuItem.Name, line.Quantity, $"${line.LineTotal:F2}");
+        UpdateRunningTotal();
     }
 
     private void RefreshStayCombos()
@@ -1130,11 +1214,6 @@ public partial class MainForm : Form
             cmbStay.Items.Add(stay);
         cmbStay.DisplayMember = "DisplayLabel";
         if (cmbStay.Items.Count > 0) cmbStay.SelectedIndex = 0;
-
-        cmbMenuItem.Items.Clear();
-        foreach (var item in _store.MenuItems.Where(m => m.IsAvailable))
-            cmbMenuItem.Items.Add(item);
-        if (cmbMenuItem.Items.Count > 0) cmbMenuItem.SelectedIndex = 0;
     }
 
     private void RefreshOrdersGrid()
@@ -1229,23 +1308,6 @@ public partial class MainForm : Form
     {
         RefreshOrderDetail();
         UpdateRestaurantButtons();
-    }
-
-    private void BtnAddLine_Click(object? sender, EventArgs e)
-    {
-        if (cmbMenuItem.SelectedItem is not Models.MenuItem menuItem) return;
-
-        var line = new OrderLine
-        {
-            MenuItem = menuItem,
-            Quantity = (int)nudQty.Value,
-            Notes = txtLineNotes.Text.Trim()
-        };
-        _currentOrderLines.Add(line);
-        dgvCurrentOrderLines.Rows.Add(line.MenuItem.Name, line.Quantity, line.Notes, $"${line.LineTotal:F2}");
-        nudQty.Value = 1;
-        txtLineNotes.Clear();
-        UpdateRunningTotal();
     }
 
     private void DgvCurrentOrderLines_CellClick(object? sender, DataGridViewCellEventArgs e)
@@ -1448,22 +1510,14 @@ public partial class MainForm : Form
 
     // --- Menu Management ---
 
-    private Models.MenuItem? GetSelectedMenuItem()
-    {
-        if (dgvMenu.CurrentRow == null) return null;
-        var idx = dgvMenu.CurrentRow.Index;
-        var items = _selectedMenuCategory == "All"
-            ? _store.MenuItems.ToList()
-            : _store.MenuItems.Where(m => m.Category == _selectedMenuCategory).ToList();
-        return idx >= 0 && idx < items.Count ? items[idx] : null;
-    }
+    private Models.MenuItem? GetSelectedMenuItem() => _selectedMenuItem;
 
     private void ShowMenuItemDialog(Models.MenuItem? existing)
     {
         using var dlg = new Form
         {
             Text = existing == null ? "Add Menu Item" : "Edit Menu Item",
-            Size = new Size(340, 280),
+            Size = new Size(420, 440),
             StartPosition = FormStartPosition.CenterParent,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
@@ -1472,16 +1526,16 @@ public partial class MainForm : Form
         };
 
         var lblN = new Label { Text = "Name:", Font = new Font("Segoe UI", 10), Location = new Point(20, 20), AutoSize = true };
-        var txtName = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(100, 17), Size = new Size(200, 28), Text = existing?.Name ?? "" };
+        var txtName = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(110, 17), Size = new Size(260, 28), Text = existing?.Name ?? "" };
 
         var lblP = new Label { Text = "Price:", Font = new Font("Segoe UI", 10), Location = new Point(20, 55), AutoSize = true };
-        var txtPrice = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(100, 52), Size = new Size(100, 28), Text = existing?.Price.ToString("F2") ?? "0.00" };
+        var txtPrice = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(110, 52), Size = new Size(100, 28), Text = existing?.Price.ToString("F2") ?? "0.00" };
 
         var lblC = new Label { Text = "Category:", Font = new Font("Segoe UI", 10), Location = new Point(20, 90), AutoSize = true };
         var cmbCat = new ComboBox
         {
             Font = new Font("Segoe UI", 10),
-            Location = new Point(100, 87),
+            Location = new Point(110, 87),
             Size = new Size(200, 28)
         };
         foreach (var cat in _restaurantService.GetCategories())
@@ -1492,9 +1546,74 @@ public partial class MainForm : Form
         {
             Text = "Available",
             Font = new Font("Segoe UI", 10),
-            Location = new Point(100, 122),
+            Location = new Point(110, 122),
             AutoSize = true,
             Checked = existing?.IsAvailable ?? true
+        };
+
+        var lblImg = new Label { Text = "Image:", Font = new Font("Segoe UI", 10), Location = new Point(20, 160), AutoSize = true };
+        var picPreview = new PictureBox
+        {
+            Location = new Point(110, 160),
+            Size = new Size(120, 90),
+            BorderStyle = BorderStyle.FixedSingle,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = AppColors.Gray100
+        };
+        if (!string.IsNullOrEmpty(existing?.ImagePath) && File.Exists(existing.ImagePath))
+        {
+            try { picPreview.Image = Image.FromFile(existing.ImagePath); } catch { }
+        }
+
+        string? pendingImagePath = existing?.ImagePath;
+        var btnPickImage = new Button
+        {
+            Text = "Choose…",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = AppColors.Primary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(100, 28),
+            Location = new Point(240, 160),
+            Cursor = Cursors.Hand
+        };
+        btnPickImage.FlatAppearance.BorderSize = 0;
+        btnPickImage.Click += (s, e) =>
+        {
+            using var ofd = new OpenFileDialog
+            {
+                Title = "Select menu item image",
+                Filter = "Image files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All files|*.*"
+            };
+            if (ofd.ShowDialog(dlg) == DialogResult.OK)
+            {
+                pendingImagePath = ofd.FileName;
+                try
+                {
+                    picPreview.Image?.Dispose();
+                    picPreview.Image = Image.FromFile(ofd.FileName);
+                }
+                catch { /* ignore preview errors */ }
+            }
+        };
+
+        var btnClearImage = new Button
+        {
+            Text = "Clear",
+            Font = new Font("Segoe UI", 9),
+            BackColor = AppColors.Gray200,
+            ForeColor = AppColors.Gray800,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(70, 28),
+            Location = new Point(240, 195),
+            Cursor = Cursors.Hand
+        };
+        btnClearImage.FlatAppearance.BorderSize = 0;
+        btnClearImage.Click += (s, e) =>
+        {
+            pendingImagePath = null;
+            picPreview.Image?.Dispose();
+            picPreview.Image = null;
         };
 
         var btnOk = new Button
@@ -1505,7 +1624,7 @@ public partial class MainForm : Form
             ForeColor = Color.White,
             FlatStyle = FlatStyle.Flat,
             Size = new Size(100, 34),
-            Location = new Point(100, 160),
+            Location = new Point(110, 320),
             DialogResult = DialogResult.OK,
             Cursor = Cursors.Hand
         };
@@ -1517,12 +1636,16 @@ public partial class MainForm : Form
             Font = new Font("Segoe UI", 10),
             FlatStyle = FlatStyle.Flat,
             Size = new Size(80, 34),
-            Location = new Point(210, 160),
+            Location = new Point(220, 320),
             DialogResult = DialogResult.Cancel,
             Cursor = Cursors.Hand
         };
 
-        dlg.Controls.AddRange(new Control[] { lblN, txtName, lblP, txtPrice, lblC, cmbCat, chkAvail, btnOk, btnCancel });
+        dlg.Controls.AddRange(new Control[] {
+            lblN, txtName, lblP, txtPrice, lblC, cmbCat, chkAvail,
+            lblImg, picPreview, btnPickImage, btnClearImage,
+            btnOk, btnCancel
+        });
         dlg.AcceptButton = btnOk;
         dlg.CancelButton = btnCancel;
 
@@ -1542,6 +1665,13 @@ public partial class MainForm : Form
             var category = cmbCat.Text.Trim();
             if (string.IsNullOrEmpty(category)) category = "Uncategorized";
 
+            // If user picked a new image path that isn't already in MenuImages, copy it there
+            string? finalImagePath = pendingImagePath;
+            if (!string.IsNullOrEmpty(pendingImagePath) && pendingImagePath != existing?.ImagePath)
+            {
+                finalImagePath = CopyMenuImage(pendingImagePath);
+            }
+
             if (existing == null)
             {
                 _restaurantService.AddMenuItem(new Models.MenuItem
@@ -1549,19 +1679,28 @@ public partial class MainForm : Form
                     Name = name,
                     Price = price,
                     Category = category,
-                    IsAvailable = chkAvail.Checked
+                    IsAvailable = chkAvail.Checked,
+                    ImagePath = finalImagePath
                 });
             }
             else
             {
                 _restaurantService.UpdateMenuItem(existing, name, price, category, chkAvail.Checked);
+                existing.ImagePath = finalImagePath;
             }
 
-            RefreshCategoryTabs();
-            RefreshMenuGrid();
-            RefreshStayCombos();
-            RefreshRestKPIs();
+            RefreshRestaurant();
         }
+    }
+
+    private static string CopyMenuImage(string sourcePath)
+    {
+        var folder = Path.Combine(AppContext.BaseDirectory, "MenuImages");
+        Directory.CreateDirectory(folder);
+        var ext = Path.GetExtension(sourcePath);
+        var dest = Path.Combine(folder, $"{Guid.NewGuid():N}{ext}");
+        File.Copy(sourcePath, dest, overwrite: false);
+        return dest;
     }
 
     private void BtnAddMenuItem_Click(object? sender, EventArgs e) => ShowMenuItemDialog(null);
@@ -1582,7 +1721,7 @@ public partial class MainForm : Form
         var item = GetSelectedMenuItem();
         if (item == null) return;
         _restaurantService.ToggleAvailability(item);
-        RefreshMenuGrid();
+        RefreshMenuCards();
         RefreshStayCombos();
         RefreshRestKPIs();
     }
@@ -1596,7 +1735,7 @@ public partial class MainForm : Form
         {
             _restaurantService.RemoveMenuItem(item);
             RefreshCategoryTabs();
-            RefreshMenuGrid();
+            RefreshMenuCards();
             RefreshStayCombos();
             RefreshRestKPIs();
         }

@@ -4,6 +4,8 @@ public class Guest
 {
     public string Name { get; set; } = string.Empty;
     public string Contact { get; set; } = string.Empty;
+    public string Passport { get; set; } = string.Empty;
+    public Gender Gender { get; set; } = Gender.Unspecified;
     public bool IsVip { get; set; }
     public int StayCount { get; set; }
 

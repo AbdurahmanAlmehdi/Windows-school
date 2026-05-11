@@ -3,6 +3,7 @@ namespace HotelManagement.WinForms.Models;
 public class Room
 {
     public int Number { get; set; }
+    public int Floor { get; set; }
     public RoomType Type { get; set; }
     public decimal Rate { get; set; }
     public bool IsOccupied { get; set; }
@@ -10,6 +11,16 @@ public class Room
     public string MaintenanceLog { get; set; } = string.Empty;
 
     public bool IsAvailable => !IsOccupied && Condition == RoomCondition.Clean;
+
+    public int Capacity => Type switch
+    {
+        RoomType.Single => 1,
+        RoomType.Double => 2,
+        RoomType.Suite => 4,
+        RoomType.Deluxe => 4,
+        RoomType.Penthouse => 6,
+        _ => 2
+    };
 
     public string DisplayStatus
     {
