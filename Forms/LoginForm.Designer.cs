@@ -7,6 +7,7 @@ partial class LoginForm
     private System.ComponentModel.IContainer components = null!;
     private TextBox txtUsername = null!;
     private TextBox txtPassword = null!;
+    private Button btnTogglePassword = null!;
     private Button btnSignIn = null!;
     private Label lblError = null!;
 
@@ -134,11 +135,26 @@ partial class LoginForm
         {
             Font = new Font("Segoe UI", 12),
             Location = new Point(0, 195),
-            Size = new Size(340, 30),
+            Size = new Size(300, 30),
             UseSystemPasswordChar = true,
             PlaceholderText = "Enter password"
         };
         txtPassword.KeyDown += TxtPassword_KeyDown;
+
+        btnTogglePassword = new Button
+        {
+            Text = "Show",
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = AppColors.Gray200,
+            ForeColor = AppColors.Gray800,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(40, 30),
+            Location = new Point(300, 195),
+            Cursor = Cursors.Hand,
+            TabStop = false
+        };
+        btnTogglePassword.FlatAppearance.BorderSize = 0;
+        btnTogglePassword.Click += BtnTogglePassword_Click;
 
         lblError = new Label
         {
@@ -166,7 +182,7 @@ partial class LoginForm
 
         var lblHint = new Label
         {
-            Text = "Hint: admin / admin123  or  staff / staff123",
+            Text = "Hint: superadmin / superadmin123  ·  staff / staff123",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Gray400,
             Location = new Point(0, 320),
@@ -175,7 +191,7 @@ partial class LoginForm
 
         panelLogin.Controls.AddRange(new Control[] {
             lblTitle, lblSubtitle, lblUser, txtUsername,
-            lblPass, txtPassword, lblError, btnSignIn, lblHint
+            lblPass, txtPassword, btnTogglePassword, lblError, btnSignIn, lblHint
         });
 
         // Center the login panel inside the right panel on resize

@@ -2,7 +2,7 @@
 
 ## Hotel Management System (WinForms Desktop Edition)
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Date:** 2026-05-11
 **Prepared by:** Abdurahman Ibrahem
 **Standard:** IEEE Std 830-1998 — *Recommended Practice for Software Requirements Specifications*
@@ -247,11 +247,10 @@ Each requirement is identified by a stable ID of the form `FR-<area>-<n>`. Areas
 
 - **FR-AUTH-1:** The system shall authenticate users by case-insensitive username and case-sensitive password against the seeded user store.
 - **FR-AUTH-2:** Upon successful authentication, the system shall set a current-user context accessible to all forms during the session.
-- **FR-AUTH-3:** The system shall enforce role-based access:
-  - **Staff** can: view rooms, manage reservations, perform check-in/out, take restaurant orders, settle invoices.
-  - **Manager** can: do everything a Staff user can, plus add/edit/remove rooms, add/edit/remove menu items, refund invoices, view full reports.
+- **FR-AUTH-3 (v1.2):** The system shall enforce **permission-based** access. A user belongs to exactly one `Role`. A role holds a set of `Permission` records, each of the form `(Resource, Action)` where `Resource ∈ {Rooms, Reservations, MenuItems, Orders, Invoices, Users}` and `Action ∈ {Create, Read, Update, Delete}`. A user may perform an action **iff** their role's permission set contains the corresponding `(Resource, Action)` pair.
 - **FR-AUTH-4:** The system shall provide a Logout action that clears the current user and returns to the LoginForm.
 - **FR-AUTH-5:** On three consecutive failed login attempts within one session, the LoginForm shall display a warning. (No lockout in v1.0; this is informational only.)
+- **FR-AUTH-6 (v1.2):** Permission checks shall be enforced both in the UI (controls/tabs hidden when the current user lacks the required permission) and at the service layer (service methods throw `UnauthorizedAccessException` when invoked without the required permission). UI hiding is defence-in-depth, not the primary control (NFR-SEC-3).
 
 #### 3.2.2 Room Management
 
@@ -341,6 +340,22 @@ Each requirement is identified by a stable ID of the form `FR-<area>-<n>`. Areas
 - **FR-RPT-7:** The system shall compute **today's served-order revenue** as the sum of totals on all orders with status `Served` and `CreatedAt.Date == today`.
 - **FR-RPT-8:** The system shall compute **today's invoice revenue** as the sum of totals on invoices `Paid` today.
 - **FR-DSH-1:** The MainForm dashboard shall present, at minimum: occupancy rate, today's revenue, count of active stays, count of pending invoices, and top 5 menu items.
+
+#### 3.2.8 Users & Roles (v1.2)
+
+- **FR-USR-1:** The system shall seed three roles on first launch:
+  - **SuperAdmin** — system role (`IsSystem = true`); holds every `(Resource, Action)` permission; cannot be renamed, edited, or deleted via the UI.
+  - **Manager** — every permission except `Users.*`.
+  - **Staff** — `Rooms.Read`, `MenuItems.Read`, `Reservations.{Create, Read, Update}`, `Orders.{Create, Read, Update}`, `Invoices.{Read, Update}`.
+- **FR-USR-2:** The system shall seed a `superadmin` user (password `superadmin123` in the academic build) assigned to the SuperAdmin role, and a `staff` user (`staff123`) assigned to the Staff role. These seed credentials shall be hashed per NFR-SEC-1 before any production deployment.
+- **FR-USR-3:** A "Users" tab in MainForm shall be visible **only** to users whose role has `Users.Read`. The tab shall contain two sub-tabs: **Users** and **Roles**.
+- **FR-USR-4:** The Users sub-tab shall list every user (username, role name, permission count) and offer Add / Edit / Remove buttons gated by `Users.{Create, Update, Delete}` respectively.
+- **FR-USR-5:** The Roles sub-tab shall list every role (name, system flag, permission count) and offer Add / Edit / Remove buttons. Editing or removing a `IsSystem` role shall be refused.
+- **FR-USR-6:** The Add/Edit Role dialog shall present the full permission matrix (resources × actions) as checkboxes; saving persists the checked permissions to the role.
+- **FR-USR-7:** The system shall refuse to remove:
+  - the currently signed-in user (self-removal),
+  - the last remaining user with a system role (lock-out protection).
+- **FR-USR-8:** Removing a role assigned to one or more users shall be refused with an explanatory error; the operator must reassign affected users first.
 
 ---
 
@@ -481,7 +496,10 @@ Although v1.0 has no relational store, the in-memory model defines the conceptua
 #### 3.5.1 Entity overview
 
 ```
-User (Username PK, Password, Role)
+Role (Id PK*, Name, IsSystem, Permissions: set<(Resource, Action)>)
+
+User (Username PK, Password, RoleId FK→Role)
+      -- v1.2: replaced UserRole enum with a Role reference
 
 Room (Number PK, Floor, Type, Rate, IsOccupied, Condition, MaintenanceLog)
       -- Capacity derived from Type (1/2/4/4/6)
@@ -576,6 +594,7 @@ InvoiceLine (Id PK*, InvoiceId FK→Invoice, Description,
 | Room CRUD | FR-ROOM-1..10 | NFR-MNT-1 |
 | Menu CRUD | FR-RST-1..3, FR-RST-9..10 | NFR-MNT-1 |
 | Restaurant Tabbed UI (v1.1) | FR-RST-11 | NFR-USE-4 |
+| Users & Roles (v1.2) | FR-USR-1..8, FR-AUTH-3, FR-AUTH-6 | NFR-SEC-3 |
 
 ### 4.2 Appendices
 
@@ -583,7 +602,7 @@ InvoiceLine (Id PK*, InvoiceId FK→Invoice, Description,
 
 | Username | Password | Role |
 |---|---|---|
-| `admin` | `admin123` | Manager |
+| `superadmin` | `superadmin123` | SuperAdmin (system; all permissions) |
 | `staff` | `staff123` | Staff |
 
 > These credentials exist solely to allow demonstration without registration. They must be removed and replaced with hashed credentials before any deployment outside of academic evaluation (NFR-SEC-1, CON-7).
@@ -619,6 +638,7 @@ This corresponds exactly to the `INV-1001` seeded record, validating FR-INV-1 an
 |---|---|---|---|
 | 1.0 | 2026-05-08 | Abdurahman Ibrahem | Initial IEEE-830 SRS for v1.0 academic release. |
 | 1.1 | 2026-05-11 | Abdurahman Ibrahem | Added: Room.Floor + per-RoomType capacity (FR-ROOM-9, FR-ROOM-10); Guest.Passport + Guest.Gender (FR-GUEST-1, FR-GUEST-4); reservation redesign with modal dialog, accompanying guests, capacity check, and marriage-certificate rule (FR-RES-7…11); menu-item images and the shared placeholder asset (FR-RST-9, FR-RST-10); Restaurant screen split into "Place Orders" + "Active Orders" sub-tabs with a card grid (FR-RST-11). MainForm now opens maximized. Reports tab hidden (deferred). Data model gained `reservation_accompanying` table and new columns on `rooms`, `guests`, `menu_items`, `reservations`. |
+| 1.2 | 2026-05-11 | Abdurahman Ibrahem | Replaced the Staff/Manager enum with a CRUD permission model (FR-AUTH-3, FR-AUTH-6). Added Users & Roles management (FR-USR-1…8): new `Role` entity with `IsSystem` flag, seeded SuperAdmin/Manager/Staff roles, seeded `superadmin`/`staff` users, new Users tab with Users + Roles sub-tabs, permission-matrix dialog, service-layer enforcement on Rooms.* and MenuItems.* mutations. Database gained `roles` + `role_permissions` tables; `users.role` enum replaced with `users.role_id` FK. |
 
 ---
 

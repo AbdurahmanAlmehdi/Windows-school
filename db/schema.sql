@@ -1,7 +1,11 @@
 -- =====================================================================
--- Hotel Management System - MySQL Schema (v1.1)
+-- Hotel Management System - MySQL Schema (v1.2)
 -- Target:  MySQL 8.0+ (utf8mb4 / InnoDB)
 -- Source:  SRS.md  §3.5 Logical Data Model
+--
+-- v1.2 changes vs v1.1:
+--   * roles + role_permissions (new tables — CRUD permission model)
+--   * users.role enum dropped; users.role_id FK -> roles
 --
 -- v1.1 changes vs v1.0:
 --   * rooms.floor             (new column)
@@ -21,15 +25,37 @@ SET
 USE hotel_management;
 
 -- ---------------------------------------------------------------------
+-- ROLES + ROLE_PERMISSIONS  (CRUD permission model)
+-- ---------------------------------------------------------------------
+CREATE TABLE roles (
+    id          INT          NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(64)  NOT NULL,
+    is_system   BOOLEAN      NOT NULL DEFAULT FALSE,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_roles_name (name)
+) ENGINE = InnoDB;
+
+CREATE TABLE role_permissions (
+    role_id   INT NOT NULL,
+    resource  ENUM('Rooms','Reservations','MenuItems','Orders','Invoices','Users') NOT NULL,
+    action    ENUM('Create','Read','Update','Delete') NOT NULL,
+    PRIMARY KEY (role_id, resource, action),
+    CONSTRAINT fk_rp_role FOREIGN KEY (role_id) REFERENCES roles(id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE = InnoDB;
+
+-- ---------------------------------------------------------------------
 -- USERS
 -- ---------------------------------------------------------------------
 CREATE TABLE users (
     id INT NOT NULL AUTO_INCREMENT,
     username VARCHAR(64) NOT NULL,
     password_hash VARCHAR(255) NOT NULL, -- BCrypt/Argon2id hash (NFR-SEC-1)
-    role ENUM('Staff', 'Manager') NOT NULL,
+    role_id INT NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uk_users_username (username)
+    UNIQUE KEY uk_users_username (username),
+    CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id)
+        ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE = InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -258,18 +284,50 @@ CREATE TABLE invoice_lines (
 -- SEED DATA  (mirrors Data/SeedData.cs from the WinForms app)
 -- =====================================================================
 
-INSERT INTO
-    users (username, password_hash, role)
-VALUES (
-        'admin',
-        '$2a$replace_with_bcrypt_hash_admin',
-        'Manager'
-    ),
-    (
-        'staff',
-        '$2a$replace_with_bcrypt_hash_staff',
-        'Staff'
-    );
+-- Seed roles
+INSERT INTO roles (name, is_system) VALUES
+  ('SuperAdmin', TRUE),
+  ('Manager',    FALSE),
+  ('Staff',      FALSE);
+
+SET @superadmin_id = (SELECT id FROM roles WHERE name = 'SuperAdmin');
+SET @manager_id    = (SELECT id FROM roles WHERE name = 'Manager');
+SET @staff_id      = (SELECT id FROM roles WHERE name = 'Staff');
+
+-- SuperAdmin: every (resource, action) pair.
+INSERT INTO role_permissions (role_id, resource, action)
+SELECT @superadmin_id, r.resource, a.action
+FROM
+  (SELECT 'Rooms' AS resource UNION SELECT 'Reservations' UNION SELECT 'MenuItems'
+   UNION SELECT 'Orders' UNION SELECT 'Invoices' UNION SELECT 'Users') r
+  CROSS JOIN
+  (SELECT 'Create' AS action UNION SELECT 'Read' UNION SELECT 'Update' UNION SELECT 'Delete') a;
+
+-- Manager: everything except Users.*
+INSERT INTO role_permissions (role_id, resource, action)
+SELECT @manager_id, r.resource, a.action
+FROM
+  (SELECT 'Rooms' AS resource UNION SELECT 'Reservations' UNION SELECT 'MenuItems'
+   UNION SELECT 'Orders' UNION SELECT 'Invoices') r
+  CROSS JOIN
+  (SELECT 'Create' AS action UNION SELECT 'Read' UNION SELECT 'Update' UNION SELECT 'Delete') a;
+
+-- Staff: read-only for Rooms / MenuItems; CRUD-light on the operational resources.
+INSERT INTO role_permissions (role_id, resource, action) VALUES
+  (@staff_id, 'Rooms',        'Read'),
+  (@staff_id, 'Reservations', 'Create'),
+  (@staff_id, 'Reservations', 'Read'),
+  (@staff_id, 'Reservations', 'Update'),
+  (@staff_id, 'MenuItems',    'Read'),
+  (@staff_id, 'Orders',       'Create'),
+  (@staff_id, 'Orders',       'Read'),
+  (@staff_id, 'Orders',       'Update'),
+  (@staff_id, 'Invoices',     'Read'),
+  (@staff_id, 'Invoices',     'Update');
+
+INSERT INTO users (username, password_hash, role_id) VALUES
+  ('superadmin', '$2a$replace_with_bcrypt_hash_superadmin', @superadmin_id),
+  ('staff',      '$2a$replace_with_bcrypt_hash_staff',      @staff_id);
 
 INSERT INTO rooms (number, floor, type, rate, is_occupied, `condition`, maintenance_log) VALUES
   (101, 1, 'Single',    99.99,  FALSE, 'Clean',          NULL),
