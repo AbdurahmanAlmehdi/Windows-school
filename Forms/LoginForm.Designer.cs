@@ -135,7 +135,7 @@ partial class LoginForm
         {
             Font = new Font("Segoe UI", 12),
             Location = new Point(0, 195),
-            Size = new Size(300, 30),
+            Size = new Size(284, 30),
             UseSystemPasswordChar = true,
             PlaceholderText = "Enter password"
         };
@@ -148,8 +148,8 @@ partial class LoginForm
             BackColor = AppColors.Gray200,
             ForeColor = AppColors.Gray800,
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(40, 30),
-            Location = new Point(300, 195),
+            Size = new Size(56, 30),
+            Location = new Point(284, 195),
             Cursor = Cursors.Hand,
             TabStop = false
         };
