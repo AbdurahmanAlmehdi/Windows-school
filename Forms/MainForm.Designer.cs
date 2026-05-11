@@ -1339,16 +1339,15 @@ partial class MainForm
 
     private void BuildActiveOrdersSubTab(TabPage tab)
     {
-        var split = new SplitContainer
+        // Layout: right sidebar (order detail + action buttons) docked at fixed width; orders grid fills.
+
+        // --- Right: detail panel + action buttons (built first so it docks before main fills) ---
+        var pnlOrderRight = new Panel
         {
-            Dock = DockStyle.Fill,
-            SplitterDistance = 520,
-            Orientation = Orientation.Vertical,
+            Dock = DockStyle.Right,
+            Width = 480,
             BackColor = AppColors.Surface
         };
-
-        // --- Left: filter + orders grid ---
-        var pnlOrdersLeft = new Panel { Dock = DockStyle.Fill, BackColor = AppColors.Surface };
 
         var pnlFilterRow = new Panel
         {
