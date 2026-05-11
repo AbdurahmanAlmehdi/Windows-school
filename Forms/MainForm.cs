@@ -14,6 +14,7 @@ public partial class MainForm : Form
     private readonly RestaurantService _restaurantService;
     private readonly ReportService _reportService;
     private readonly InvoiceService _invoiceService;
+    private readonly UserService _userService;
     private readonly DataStore _store;
 
     private Room? _selectedRoom;
@@ -27,6 +28,7 @@ public partial class MainForm : Form
         RestaurantService restaurantService,
         ReportService reportService,
         InvoiceService invoiceService,
+        UserService userService,
         DataStore dataStore)
     {
         _authService = authService;
@@ -35,6 +37,7 @@ public partial class MainForm : Form
         _restaurantService = restaurantService;
         _reportService = reportService;
         _invoiceService = invoiceService;
+        _userService = userService;
         _store = dataStore;
 
         InitializeComponent();
@@ -47,17 +50,19 @@ public partial class MainForm : Form
         // Hide Reports tab for now
         tabMain.TabPages.Remove(tabReports);
 
-        // Hide management controls for non-managers
-        if (_authService.CurrentUser != null && !_authService.CurrentUser.IsManager)
-        {
-            btnAddMenuItem.Visible = false;
-            btnEditMenuItem.Visible = false;
-            btnToggleAvail.Visible = false;
-            btnRemoveMenuItem.Visible = false;
-            btnAddRoom.Visible = false;
-            btnEditRoom.Visible = false;
-            btnRemoveRoom.Visible = false;
-        }
+        // Hide the Users tab when the current role can't even read users.
+        if (!_authService.Can(PermissionResource.Users, PermissionAction.Read))
+            tabMain.TabPages.Remove(tabUsers);
+
+        // Gate management controls based on per-resource CRUD permissions.
+        btnAddRoom.Visible    = _authService.Can(PermissionResource.Rooms, PermissionAction.Create);
+        btnEditRoom.Visible   = _authService.Can(PermissionResource.Rooms, PermissionAction.Update);
+        btnRemoveRoom.Visible = _authService.Can(PermissionResource.Rooms, PermissionAction.Delete);
+
+        btnAddMenuItem.Visible    = _authService.Can(PermissionResource.MenuItems, PermissionAction.Create);
+        btnEditMenuItem.Visible   = _authService.Can(PermissionResource.MenuItems, PermissionAction.Update);
+        btnToggleAvail.Visible    = _authService.Can(PermissionResource.MenuItems, PermissionAction.Update);
+        btnRemoveMenuItem.Visible = _authService.Can(PermissionResource.MenuItems, PermissionAction.Delete);
 
         Load += MainForm_Load;
     }
@@ -78,6 +83,7 @@ public partial class MainForm : Form
         else if (tabMain.SelectedTab == tabRestaurant) RefreshRestaurant();
         else if (tabMain.SelectedTab == tabFinances) RefreshFinances();
         else if (tabMain.SelectedTab == tabReports) RefreshReports();
+        else if (tabMain.SelectedTab == tabUsers) RefreshUsers();
     }
 
     private void BtnLogout_Click(object? sender, EventArgs e)
@@ -1955,4 +1961,311 @@ public partial class MainForm : Form
     }
 
     private void BtnRefreshReports_Click(object? sender, EventArgs e) => RefreshReports();
+
+    // ===================== USERS & ROLES =====================
+
+    private void RefreshUsers()
+    {
+        if (!_authService.Can(PermissionResource.Users, PermissionAction.Read)) return;
+        RefreshUsersGrid();
+        RefreshRolesGrid();
+    }
+
+    private void RefreshUsersGrid()
+    {
+        dgvUsers.Rows.Clear();
+        foreach (var u in _userService.GetUsers())
+        {
+            dgvUsers.Rows.Add(u.Username, u.Role?.Name ?? "(none)", u.Role?.Permissions.Count ?? 0);
+        }
+    }
+
+    private void RefreshRolesGrid()
+    {
+        dgvRoles.Rows.Clear();
+        foreach (var r in _userService.GetRoles())
+        {
+            dgvRoles.Rows.Add(r.Name, r.IsSystem ? "System" : "—", $"{r.Permissions.Count} / {Permission.All().Count()}");
+        }
+    }
+
+    private User? GetSelectedUser()
+    {
+        if (dgvUsers.CurrentRow == null) return null;
+        var idx = dgvUsers.CurrentRow.Index;
+        var list = _userService.GetUsers().ToList();
+        return idx >= 0 && idx < list.Count ? list[idx] : null;
+    }
+
+    private Role? GetSelectedRole()
+    {
+        if (dgvRoles.CurrentRow == null) return null;
+        var idx = dgvRoles.CurrentRow.Index;
+        var list = _userService.GetRoles().ToList();
+        return idx >= 0 && idx < list.Count ? list[idx] : null;
+    }
+
+    private void BtnAddUser_Click(object? sender, EventArgs e) => ShowUserDialog(null);
+
+    private void BtnEditUser_Click(object? sender, EventArgs e)
+    {
+        var u = GetSelectedUser();
+        if (u == null) { Warn("Select a user first."); return; }
+        ShowUserDialog(u);
+    }
+
+    private void BtnRemoveUser_Click(object? sender, EventArgs e)
+    {
+        var u = GetSelectedUser();
+        if (u == null) { Warn("Select a user first."); return; }
+        if (MessageBox.Show($"Remove user '{u.Username}'?", "Confirm",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+
+        try
+        {
+            _userService.RemoveUser(u);
+            RefreshUsers();
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private void BtnAddRole_Click(object? sender, EventArgs e) => ShowRoleDialog(null);
+
+    private void BtnEditRole_Click(object? sender, EventArgs e)
+    {
+        var r = GetSelectedRole();
+        if (r == null) { Warn("Select a role first."); return; }
+        if (r.IsSystem) { Warn($"The system role '{r.Name}' cannot be modified."); return; }
+        ShowRoleDialog(r);
+    }
+
+    private void BtnRemoveRole_Click(object? sender, EventArgs e)
+    {
+        var r = GetSelectedRole();
+        if (r == null) { Warn("Select a role first."); return; }
+        if (MessageBox.Show($"Remove role '{r.Name}'?", "Confirm",
+            MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+
+        try
+        {
+            _userService.RemoveRole(r);
+            RefreshUsers();
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private void ShowUserDialog(User? existing)
+    {
+        using var dlg = new Form
+        {
+            Text = existing == null ? "Add User" : "Edit User",
+            Size = new Size(420, 320),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = AppColors.Surface
+        };
+
+        var lblU = new Label { Text = "Username:", Font = new Font("Segoe UI", 10), Location = new Point(20, 20), AutoSize = true };
+        var txtU = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(130, 17), Size = new Size(250, 28), Text = existing?.Username ?? "" };
+
+        var lblP = new Label
+        {
+            Text = existing == null ? "Password:" : "New password:",
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(20, 55),
+            AutoSize = true
+        };
+        var txtP = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(130, 52), Size = new Size(250, 28), UseSystemPasswordChar = true };
+        var lblPHint = new Label
+        {
+            Text = existing == null ? "" : "(leave blank to keep current)",
+            Font = new Font("Segoe UI", 8, FontStyle.Italic),
+            ForeColor = AppColors.Gray500,
+            Location = new Point(130, 82),
+            AutoSize = true
+        };
+
+        var lblR = new Label { Text = "Role:", Font = new Font("Segoe UI", 10), Location = new Point(20, 110), AutoSize = true };
+        var cmbR = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(130, 107),
+            Size = new Size(250, 28),
+            DisplayMember = nameof(Role.Name)
+        };
+        foreach (var role in _userService.GetRoles()) cmbR.Items.Add(role);
+        if (existing != null) cmbR.SelectedItem = existing.Role;
+        else if (cmbR.Items.Count > 0) cmbR.SelectedIndex = 0;
+
+        var btnOk = new Button
+        {
+            Text = existing == null ? "Add" : "Save",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(100, 36),
+            Location = new Point(180, 170),
+            DialogResult = DialogResult.OK,
+            Cursor = Cursors.Hand
+        };
+        btnOk.FlatAppearance.BorderSize = 0;
+
+        var btnCancel = new Button
+        {
+            Text = "Cancel",
+            Font = new Font("Segoe UI", 10),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(90, 36),
+            Location = new Point(290, 170),
+            DialogResult = DialogResult.Cancel,
+            Cursor = Cursors.Hand
+        };
+
+        dlg.Controls.AddRange(new Control[] { lblU, txtU, lblP, txtP, lblPHint, lblR, cmbR, btnOk, btnCancel });
+        dlg.AcceptButton = btnOk;
+        dlg.CancelButton = btnCancel;
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var role = cmbR.SelectedItem as Role;
+            if (existing == null)
+                _userService.AddUser(txtU.Text.Trim(), txtP.Text, role!);
+            else
+                _userService.UpdateUser(existing, txtU.Text.Trim(), txtP.Text.Length > 0 ? txtP.Text : null, role!);
+            RefreshUsers();
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private void ShowRoleDialog(Role? existing)
+    {
+        using var dlg = new Form
+        {
+            Text = existing == null ? "Add Role" : $"Edit Role — {existing.Name}",
+            Size = new Size(620, 480),
+            StartPosition = FormStartPosition.CenterParent,
+            FormBorderStyle = FormBorderStyle.FixedDialog,
+            MaximizeBox = false,
+            MinimizeBox = false,
+            BackColor = AppColors.Surface
+        };
+
+        var lblN = new Label { Text = "Role name:", Font = new Font("Segoe UI", 10), Location = new Point(20, 20), AutoSize = true };
+        var txtN = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(130, 17), Size = new Size(300, 28), Text = existing?.Name ?? "" };
+
+        var lblM = new Label
+        {
+            Text = "Permissions (check the actions this role can perform):",
+            Font = new Font("Segoe UI", 9, FontStyle.Italic),
+            ForeColor = AppColors.Gray600,
+            Location = new Point(20, 56),
+            AutoSize = true
+        };
+
+        // Permission matrix: rows = resources, columns = actions
+        var grid = new TableLayoutPanel
+        {
+            Location = new Point(20, 80),
+            Size = new Size(560, 290),
+            ColumnCount = 5,
+            RowCount = Enum.GetValues<PermissionResource>().Length + 1,
+            BackColor = Color.White,
+            CellBorderStyle = TableLayoutPanelCellBorderStyle.Single
+        };
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32));
+        for (int i = 0; i < 4; i++) grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 17));
+
+        // Header row
+        grid.Controls.Add(new Label { Text = "Resource", Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, BackColor = AppColors.Primary, ForeColor = Color.White }, 0, 0);
+        int col = 1;
+        foreach (var a in Enum.GetValues<PermissionAction>())
+        {
+            grid.Controls.Add(new Label { Text = a.ToString(), Font = new Font("Segoe UI", 9, FontStyle.Bold), TextAlign = ContentAlignment.MiddleCenter, Dock = DockStyle.Fill, BackColor = AppColors.Primary, ForeColor = Color.White }, col++, 0);
+        }
+
+        var checkboxes = new Dictionary<Permission, CheckBox>();
+        int row = 1;
+        foreach (var r in Enum.GetValues<PermissionResource>())
+        {
+            grid.Controls.Add(new Label
+            {
+                Text = r.ToString(),
+                Font = new Font("Segoe UI", 9),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(8, 0, 0, 0),
+                Dock = DockStyle.Fill
+            }, 0, row);
+
+            col = 1;
+            foreach (var a in Enum.GetValues<PermissionAction>())
+            {
+                var perm = new Permission(r, a);
+                var cb = new CheckBox
+                {
+                    Dock = DockStyle.Fill,
+                    CheckAlign = ContentAlignment.MiddleCenter,
+                    Checked = existing?.Has(r, a) ?? false,
+                    Enabled = !(existing?.IsSystem ?? false)
+                };
+                checkboxes[perm] = cb;
+                grid.Controls.Add(cb, col++, row);
+            }
+            row++;
+        }
+
+        var btnOk = new Button
+        {
+            Text = existing == null ? "Add" : "Save",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Tertiary,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(110, 36),
+            Location = new Point(380, 390),
+            DialogResult = DialogResult.OK,
+            Cursor = Cursors.Hand,
+            Enabled = !(existing?.IsSystem ?? false)
+        };
+        btnOk.FlatAppearance.BorderSize = 0;
+
+        var btnCancel = new Button
+        {
+            Text = "Cancel",
+            Font = new Font("Segoe UI", 10),
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(90, 36),
+            Location = new Point(500, 390),
+            DialogResult = DialogResult.Cancel,
+            Cursor = Cursors.Hand
+        };
+
+        dlg.Controls.AddRange(new Control[] { lblN, txtN, lblM, grid, btnOk, btnCancel });
+        dlg.AcceptButton = btnOk;
+        dlg.CancelButton = btnCancel;
+
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            var selected = checkboxes.Where(kv => kv.Value.Checked).Select(kv => kv.Key);
+            if (existing == null)
+                _userService.AddRole(txtN.Text.Trim(), selected);
+            else
+                _userService.UpdateRole(existing, txtN.Text.Trim(), selected);
+            RefreshUsers();
+        }
+        catch (Exception ex) { ShowError(ex); }
+    }
+
+    private void Warn(string msg) =>
+        MessageBox.Show(this, msg, "Notice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+    private void ShowError(Exception ex) =>
+        MessageBox.Show(this, ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
 }

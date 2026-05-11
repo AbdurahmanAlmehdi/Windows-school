@@ -20,6 +20,20 @@ partial class MainForm
     private TabPage tabRooms = null!;
     private TabPage tabRestaurant = null!;
     private TabPage tabReports = null!;
+    private TabPage tabUsers = null!;
+
+    // Users tab controls
+    private TabControl userSubTabs = null!;
+    private TabPage subTabUsers = null!;
+    private TabPage subTabRoles = null!;
+    private DataGridView dgvUsers = null!;
+    private DataGridView dgvRoles = null!;
+    private Button btnAddUser = null!;
+    private Button btnEditUser = null!;
+    private Button btnRemoveUser = null!;
+    private Button btnAddRole = null!;
+    private Button btnEditRole = null!;
+    private Button btnRemoveRole = null!;
 
     // Dashboard - Welcome bar
     private Panel pnlWelcomeBar = null!;
@@ -230,6 +244,7 @@ partial class MainForm
         tabRestaurant = new TabPage("Restaurant") { BackColor = AppColors.Surface, Padding = new Padding(16) };
         tabFinances = new TabPage("Finances") { BackColor = AppColors.Surface, Padding = new Padding(0) };
         tabReports = new TabPage("Reports") { BackColor = AppColors.Surface, Padding = new Padding(16) };
+        tabUsers = new TabPage("Users") { BackColor = AppColors.Surface, Padding = new Padding(0) };
 
         tabMain.TabPages.Add(tabDashboard);
         tabMain.TabPages.Add(tabReservations);
@@ -237,6 +252,7 @@ partial class MainForm
         tabMain.TabPages.Add(tabRestaurant);
         tabMain.TabPages.Add(tabFinances);
         tabMain.TabPages.Add(tabReports);
+        tabMain.TabPages.Add(tabUsers);
         tabMain.SelectedIndexChanged += TabMain_SelectedIndexChanged;
 
         InitDashboardTab();
@@ -245,6 +261,7 @@ partial class MainForm
         InitRestaurantTab();
         InitFinancesTab();
         InitReportsTab();
+        InitUsersTab();
 
         Controls.Add(tabMain);
         Controls.Add(panelHeader);
@@ -1856,5 +1873,155 @@ partial class MainForm
         });
 
         tabReports.Controls.Add(flpReports);
+    }
+
+    private void InitUsersTab()
+    {
+        // Header
+        var pnlUsersHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 55,
+            BackColor = AppColors.Primary
+        };
+        pnlUsersHeader.Controls.Add(new Label
+        {
+            Text = "Users & Roles",
+            Font = new Font("Segoe UI", 16, FontStyle.Bold),
+            ForeColor = AppColors.Accent,
+            AutoSize = true,
+            Location = new Point(20, 12)
+        });
+
+        // Sub-tabs
+        userSubTabs = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            Padding = new Point(16, 8)
+        };
+        subTabUsers = new TabPage("Users") { BackColor = AppColors.Surface, Padding = new Padding(12) };
+        subTabRoles = new TabPage("Roles") { BackColor = AppColors.Surface, Padding = new Padding(12) };
+        userSubTabs.TabPages.Add(subTabUsers);
+        userSubTabs.TabPages.Add(subTabRoles);
+
+        BuildUsersSubTab(subTabUsers);
+        BuildRolesSubTab(subTabRoles);
+
+        tabUsers.Controls.Add(userSubTabs);
+        tabUsers.Controls.Add(pnlUsersHeader);
+    }
+
+    private void BuildUsersSubTab(TabPage tab)
+    {
+        var pnlActions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 48,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 8, 0, 0)
+        };
+
+        btnAddUser = MakeActionButton("+ Add User", AppColors.Tertiary, Color.White);
+        btnAddUser.Click += BtnAddUser_Click;
+
+        btnEditUser = MakeActionButton("Edit", AppColors.Primary, Color.White);
+        btnEditUser.Click += BtnEditUser_Click;
+
+        btnRemoveUser = MakeActionButton("Remove", AppColors.StatusOOS, Color.White);
+        btnRemoveUser.Click += BtnRemoveUser_Click;
+
+        pnlActions.Controls.AddRange(new Control[] { btnAddUser, btnEditUser, btnRemoveUser });
+
+        dgvUsers = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            RowHeadersVisible = false,
+            Font = new Font("Segoe UI", 10),
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(245, 248, 255) }
+        };
+        dgvUsers.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
+        dgvUsers.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        dgvUsers.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+        dgvUsers.EnableHeadersVisualStyles = false;
+        dgvUsers.Columns.Add("Username", "Username");
+        dgvUsers.Columns.Add("Role", "Role");
+        dgvUsers.Columns.Add("Permissions", "Permissions");
+
+        tab.Controls.Add(dgvUsers);
+        tab.Controls.Add(pnlActions);
+    }
+
+    private void BuildRolesSubTab(TabPage tab)
+    {
+        var pnlActions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 48,
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            Padding = new Padding(0, 8, 0, 0)
+        };
+
+        btnAddRole = MakeActionButton("+ Add Role", AppColors.Tertiary, Color.White);
+        btnAddRole.Click += BtnAddRole_Click;
+
+        btnEditRole = MakeActionButton("Edit", AppColors.Primary, Color.White);
+        btnEditRole.Click += BtnEditRole_Click;
+
+        btnRemoveRole = MakeActionButton("Remove", AppColors.StatusOOS, Color.White);
+        btnRemoveRole.Click += BtnRemoveRole_Click;
+
+        pnlActions.Controls.AddRange(new Control[] { btnAddRole, btnEditRole, btnRemoveRole });
+
+        dgvRoles = new DataGridView
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            RowHeadersVisible = false,
+            Font = new Font("Segoe UI", 10),
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle { BackColor = Color.FromArgb(245, 248, 255) }
+        };
+        dgvRoles.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
+        dgvRoles.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        dgvRoles.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 10, FontStyle.Bold);
+        dgvRoles.EnableHeadersVisualStyles = false;
+        dgvRoles.Columns.Add("Name", "Role");
+        dgvRoles.Columns.Add("System", "System");
+        dgvRoles.Columns.Add("Permissions", "Permissions");
+
+        tab.Controls.Add(dgvRoles);
+        tab.Controls.Add(pnlActions);
+    }
+
+    private static Button MakeActionButton(string text, Color bg, Color fg)
+    {
+        var b = new Button
+        {
+            Text = text,
+            Font = new Font("Segoe UI", 9, FontStyle.Bold),
+            BackColor = bg,
+            ForeColor = fg,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(110, 34),
+            Cursor = Cursors.Hand,
+            Margin = new Padding(0, 0, 6, 0)
+        };
+        b.FlatAppearance.BorderSize = 0;
+        return b;
     }
 }

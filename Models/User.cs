@@ -4,6 +4,8 @@ public class User
 {
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
-    public UserRole Role { get; set; }
-    public bool IsManager => Role == UserRole.Manager;
+    public Role Role { get; set; } = null!;
+
+    public bool Can(PermissionResource resource, PermissionAction action) =>
+        Role != null && Role.Has(resource, action);
 }

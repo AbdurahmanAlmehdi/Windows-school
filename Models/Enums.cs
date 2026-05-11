@@ -40,12 +40,6 @@ public enum OrderStatus
     Cancelled
 }
 
-public enum UserRole
-{
-    Staff,
-    Manager
-}
-
 public enum PaymentStatus
 {
     Pending,

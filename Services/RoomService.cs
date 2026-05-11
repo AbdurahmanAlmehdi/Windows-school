@@ -6,10 +6,12 @@ namespace HotelManagement.WinForms.Services;
 public class RoomService
 {
     private readonly DataStore _store;
+    private readonly AuthService _auth;
 
-    public RoomService(DataStore store)
+    public RoomService(DataStore store, AuthService auth)
     {
         _store = store;
+        _auth = auth;
     }
 
     public IEnumerable<Room> GetAvailableRooms() =>
@@ -31,6 +33,8 @@ public class RoomService
 
     public Room AddRoom(int number, int floor, RoomType type, decimal rate)
     {
+        _auth.Require(PermissionResource.Rooms, PermissionAction.Create);
+
         if (_store.Rooms.Any(r => r.Number == number))
             throw new InvalidOperationException($"Room {number} already exists.");
 
@@ -41,6 +45,8 @@ public class RoomService
 
     public void UpdateRoom(Room room, int number, int floor, RoomType type, decimal rate)
     {
+        _auth.Require(PermissionResource.Rooms, PermissionAction.Update);
+
         if (_store.Rooms.Any(r => r.Number == number && r != room))
             throw new InvalidOperationException($"Room {number} already exists.");
 
@@ -52,6 +58,8 @@ public class RoomService
 
     public void RemoveRoom(Room room)
     {
+        _auth.Require(PermissionResource.Rooms, PermissionAction.Delete);
+
         if (room.IsOccupied)
             throw new InvalidOperationException("Cannot remove an occupied room.");
 

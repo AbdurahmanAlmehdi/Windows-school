@@ -32,4 +32,14 @@ public class AuthService
     {
         CurrentUser = null;
     }
+
+    public bool Can(PermissionResource resource, PermissionAction action) =>
+        CurrentUser?.Can(resource, action) == true;
+
+    public void Require(PermissionResource resource, PermissionAction action)
+    {
+        if (!Can(resource, action))
+            throw new UnauthorizedAccessException(
+                $"Your role does not have permission to {action} on {resource}.");
+    }
 }

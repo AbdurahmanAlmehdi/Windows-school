@@ -9,9 +9,46 @@ public static class SeedData
 
     public static void Populate(DataStore store)
     {
-        // Users
-        store.Users.Add(new User { Username = "admin", Password = "admin123", Role = UserRole.Manager });
-        store.Users.Add(new User { Username = "staff", Password = "staff123", Role = UserRole.Staff });
+        // Roles + Users
+        var superAdminRole = new Role
+        {
+            Name = "SuperAdmin",
+            IsSystem = true,
+            Permissions = Permission.All().ToHashSet()
+        };
+
+        var managerRole = new Role
+        {
+            Name = "Manager",
+            Permissions = Permission.All()
+                .Where(p => p.Resource != PermissionResource.Users)
+                .ToHashSet()
+        };
+
+        var staffRole = new Role
+        {
+            Name = "Staff",
+            Permissions = new HashSet<Permission>
+            {
+                new(PermissionResource.Rooms,        PermissionAction.Read),
+                new(PermissionResource.Reservations, PermissionAction.Create),
+                new(PermissionResource.Reservations, PermissionAction.Read),
+                new(PermissionResource.Reservations, PermissionAction.Update),
+                new(PermissionResource.MenuItems,    PermissionAction.Read),
+                new(PermissionResource.Orders,       PermissionAction.Create),
+                new(PermissionResource.Orders,       PermissionAction.Read),
+                new(PermissionResource.Orders,       PermissionAction.Update),
+                new(PermissionResource.Invoices,     PermissionAction.Read),
+                new(PermissionResource.Invoices,     PermissionAction.Update),
+            }
+        };
+
+        store.Roles.Add(superAdminRole);
+        store.Roles.Add(managerRole);
+        store.Roles.Add(staffRole);
+
+        store.Users.Add(new User { Username = "superadmin", Password = "superadmin123", Role = superAdminRole });
+        store.Users.Add(new User { Username = "staff",      Password = "staff123",      Role = staffRole });
 
         // Rooms (floor derived from first digit of room number)
         store.Rooms.Add(new Room { Number = 101, Floor = 1, Type = RoomType.Single, Rate = 99.99m });

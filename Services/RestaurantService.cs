@@ -6,10 +6,12 @@ namespace HotelManagement.WinForms.Services;
 public class RestaurantService
 {
     private readonly DataStore _store;
+    private readonly AuthService _auth;
 
-    public RestaurantService(DataStore store)
+    public RestaurantService(DataStore store, AuthService auth)
     {
         _store = store;
+        _auth = auth;
     }
 
     public RestaurantOrder CreateOrder(Stay stay, IEnumerable<OrderLine> lines)
@@ -48,12 +50,21 @@ public class RestaurantService
     public IEnumerable<RestaurantOrder> GetOrdersForStay(Stay stay) =>
         _store.Orders.Where(o => o.Stay == stay);
 
-    public void AddMenuItem(MenuItem item) => _store.MenuItems.Add(item);
+    public void AddMenuItem(MenuItem item)
+    {
+        _auth.Require(PermissionResource.MenuItems, PermissionAction.Create);
+        _store.MenuItems.Add(item);
+    }
 
-    public void RemoveMenuItem(MenuItem item) => _store.MenuItems.Remove(item);
+    public void RemoveMenuItem(MenuItem item)
+    {
+        _auth.Require(PermissionResource.MenuItems, PermissionAction.Delete);
+        _store.MenuItems.Remove(item);
+    }
 
     public void UpdateMenuItem(MenuItem item, string name, decimal price, string category, bool isAvailable, string? imagePath = null)
     {
+        _auth.Require(PermissionResource.MenuItems, PermissionAction.Update);
         item.Name = name;
         item.Price = price;
         item.Category = category;
@@ -61,7 +72,11 @@ public class RestaurantService
         if (imagePath != null) item.ImagePath = imagePath;
     }
 
-    public void ToggleAvailability(MenuItem item) => item.IsAvailable = !item.IsAvailable;
+    public void ToggleAvailability(MenuItem item)
+    {
+        _auth.Require(PermissionResource.MenuItems, PermissionAction.Update);
+        item.IsAvailable = !item.IsAvailable;
+    }
 
     public List<string> GetCategories() =>
         _store.MenuItems.Select(m => m.Category).Distinct().OrderBy(c => c).ToList();
