@@ -1127,7 +1127,9 @@ partial class MainForm
             Dock = DockStyle.Right,
             Width = 400,
             BackColor = Color.Transparent,
-            Padding = new Padding(8)
+            Padding = new Padding(8),
+            AutoScroll = true,
+            AutoScrollMinSize = new Size(0, 480)
         };
         pnlNewOrderCard.Paint += DrawingUtilities.PaintCardBackground;
 
@@ -1154,7 +1156,7 @@ partial class MainForm
         {
             Location = new Point(16, 84),
             Size = new Size(360, 280),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             ReadOnly = true,
             AllowUserToAddRows = false,
             AllowUserToDeleteRows = false,
@@ -1163,7 +1165,8 @@ partial class MainForm
             BackgroundColor = Color.White,
             BorderStyle = BorderStyle.FixedSingle,
             RowHeadersVisible = false,
-            Font = new Font("Segoe UI", 9)
+            Font = new Font("Segoe UI", 9),
+            ScrollBars = ScrollBars.Vertical
         };
         dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
         dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
@@ -1191,8 +1194,7 @@ partial class MainForm
             Font = new Font("Segoe UI", 12, FontStyle.Bold),
             ForeColor = AppColors.Primary,
             AutoSize = true,
-            Location = new Point(16, 374),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+            Location = new Point(16, 374)
         };
 
         btnPlaceOrder = new Button
@@ -1204,8 +1206,7 @@ partial class MainForm
             FlatStyle = FlatStyle.Flat,
             Size = new Size(160, 40),
             Location = new Point(16, 402),
-            Cursor = Cursors.Hand,
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+            Cursor = Cursors.Hand
         };
         btnPlaceOrder.FlatAppearance.BorderSize = 0;
         btnPlaceOrder.Click += BtnPlaceOrder_Click;
@@ -1219,8 +1220,7 @@ partial class MainForm
             FlatStyle = FlatStyle.Flat,
             Size = new Size(90, 40),
             Location = new Point(184, 402),
-            Cursor = Cursors.Hand,
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+            Cursor = Cursors.Hand
         };
         btnClearOrder.FlatAppearance.BorderSize = 0;
         btnClearOrder.Click += BtnClearOrder_Click;
