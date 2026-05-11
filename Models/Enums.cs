@@ -69,7 +69,6 @@ public enum InvoiceLineCategory
 
 public enum Gender
 {
-    Unspecified,
     Male,
     Female
 }

@@ -57,7 +57,7 @@ public class ReservationDialog : Form
     private void BuildLayout()
     {
         Text = "New Reservation";
-        Size = new Size(640, 860);
+        Size = new Size(780, 880);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -83,13 +83,13 @@ public class ReservationDialog : Form
         {
             Dock = DockStyle.Fill,
             AutoScroll = true,
-            Padding = new Padding(24, 16, 24, 16),
+            Padding = new Padding(36, 16, 36, 16),
             BackColor = AppColors.Surface
         };
 
         int y = 0;
-        const int colW = 260;
-        const int rightX = 280;
+        const int colW = 320;
+        const int rightX = 340;
 
         // --- Guest ---
         body.Controls.Add(SectionHeader("GUEST", 0, y)); y += 28;
@@ -124,7 +124,7 @@ public class ReservationDialog : Form
             Location = new Point(rightX, y + 20),
             Size = new Size(colW, 28)
         };
-        _cmbGuestGender.Items.AddRange(new object[] { Gender.Unspecified, Gender.Male, Gender.Female });
+        _cmbGuestGender.Items.AddRange(new object[] { Gender.Male, Gender.Female });
         _cmbGuestGender.SelectedIndex = 0;
         _cmbGuestGender.SelectedIndexChanged += (s, e) => UpdateCertificateSection();
         body.Controls.Add(_cmbGuestGender);
@@ -192,7 +192,7 @@ public class ReservationDialog : Form
         _dgvAccompanying = new DataGridView
         {
             Location = new Point(0, y),
-            Size = new Size(540, 140),
+            Size = new Size(680, 160),
             AllowUserToAddRows = false,
             AllowUserToResizeRows = false,
             BackgroundColor = Color.White,
@@ -212,28 +212,28 @@ public class ReservationDialog : Form
         {
             HeaderText = "Name",
             DataPropertyName = nameof(AccompanyingGuest.Name),
-            FillWeight = 30
+            FillWeight = 26
         });
         _dgvAccompanying.Columns.Add(new DataGridViewTextBoxColumn
         {
             HeaderText = "Age",
             DataPropertyName = nameof(AccompanyingGuest.Age),
-            FillWeight = 12
+            FillWeight = 14
         });
         var genderCol = new DataGridViewComboBoxColumn
         {
             HeaderText = "Gender",
             DataPropertyName = nameof(AccompanyingGuest.Gender),
-            FillWeight = 18,
+            FillWeight = 22,
             FlatStyle = FlatStyle.Flat
         };
-        genderCol.Items.AddRange(Gender.Unspecified, Gender.Male, Gender.Female);
+        genderCol.Items.AddRange(Gender.Male, Gender.Female);
         _dgvAccompanying.Columns.Add(genderCol);
         _dgvAccompanying.Columns.Add(new DataGridViewTextBoxColumn
         {
             HeaderText = "Passport (optional)",
             DataPropertyName = nameof(AccompanyingGuest.Passport),
-            FillWeight = 40
+            FillWeight = 38
         });
 
         _dgvAccompanying.DataSource = _accompanying;
@@ -247,7 +247,7 @@ public class ReservationDialog : Form
         _dgvAccompanying.DataError += (s, e) => { e.ThrowException = false; };
 
         body.Controls.Add(_dgvAccompanying);
-        y += 150;
+        y += 170;
 
         _btnAddPerson = new Button
         {
@@ -263,7 +263,7 @@ public class ReservationDialog : Form
         _btnAddPerson.FlatAppearance.BorderSize = 0;
         _btnAddPerson.Click += (s, e) =>
         {
-            _accompanying.Add(new AccompanyingGuest { Age = 18, Gender = Gender.Unspecified });
+            _accompanying.Add(new AccompanyingGuest { Age = 18, Gender = Gender.Male });
         };
 
         _btnRemovePerson = new Button
@@ -303,7 +303,7 @@ public class ReservationDialog : Form
         _pnlCertificate = new Panel
         {
             Location = new Point(0, y),
-            Size = new Size(540, 90),
+            Size = new Size(680, 90),
             BackColor = Color.FromArgb(255, 248, 230),
             BorderStyle = BorderStyle.FixedSingle,
             Padding = new Padding(12),
@@ -523,8 +523,7 @@ public class ReservationDialog : Form
 
     private bool RequiresMarriageCertificate()
     {
-        var g = _cmbGuestGender.SelectedItem as Gender? ?? Gender.Unspecified;
-        if (g != Gender.Male && g != Gender.Female) return false;
+        if (_cmbGuestGender.SelectedItem is not Gender g) return false;
         var opposite = g == Gender.Male ? Gender.Female : Gender.Male;
         return _accompanying.Any(a => !a.IsChild && a.Gender == opposite);
     }
@@ -595,7 +594,7 @@ public class ReservationDialog : Form
             return;
         }
 
-        var guestGender = _cmbGuestGender.SelectedItem as Gender? ?? Gender.Unspecified;
+        var guestGender = (Gender)(_cmbGuestGender.SelectedItem ?? Gender.Male);
 
         string? certStoredPath = null;
         if (RequiresMarriageCertificate())

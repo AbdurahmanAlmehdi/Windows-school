@@ -268,7 +268,7 @@ Each requirement is identified by a stable ID of the form `FR-<area>-<n>`. Areas
 
 #### 3.2.3 Guest Management
 
-- **FR-GUEST-1:** The system shall allow creating a guest with name, contact information, **passport number**, and **gender** (`Unspecified | Male | Female`), optionally flagged as VIP. Passport is required when the guest is the primary guest on a new reservation (see FR-RES-7).
+- **FR-GUEST-1:** The system shall allow creating a guest with name, contact information, **passport number**, and **gender** (`Male | Female`), optionally flagged as VIP. Passport is required when the guest is the primary guest on a new reservation (see FR-RES-7).
 - **FR-GUEST-2:** The system shall maintain a `StayCount` per guest, automatically incremented on each successful check-out (FR-RES-5).
 - **FR-GUEST-3:** The system shall allow viewing a guest's history of past reservations and stays.
 - **FR-GUEST-4 (v1.1):** Looking up an existing guest by phone shall auto-fill `Name`, `Passport`, and `Gender` on the New Reservation dialog. Edits made there shall be persisted back to the guest record on save.

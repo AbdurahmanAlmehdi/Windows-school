@@ -1119,16 +1119,126 @@ partial class MainForm
 
     private void BuildPlaceOrdersSubTab(TabPage tab)
     {
-        // SplitContainer: left = categories + card grid + menu mgmt; right = order builder
-        var split = new SplitContainer
+        // Layout: right sidebar (order builder) docked at fixed width; main area fills the rest.
+
+        // --- Right: order builder card (built first so it docks before main fills) ---
+        var pnlNewOrderCard = new Panel
         {
-            Dock = DockStyle.Fill,
-            SplitterDistance = 700,
-            Orientation = Orientation.Vertical,
-            BackColor = AppColors.Surface
+            Dock = DockStyle.Right,
+            Width = 400,
+            BackColor = Color.Transparent,
+            Padding = new Padding(8)
+        };
+        pnlNewOrderCard.Paint += DrawingUtilities.PaintCardBackground;
+
+        var lblNewOrderTitle = new Label
+        {
+            Text = "NEW ORDER",
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            AutoSize = true,
+            Location = new Point(16, 12)
         };
 
-        // --- Left: categories + cards + menu management ---
+        var lblStay2 = new Label { Text = "Stay:", Font = new Font("Segoe UI", 10), Location = new Point(16, 44), AutoSize = true };
+        cmbStay = new ComboBox
+        {
+            Font = new Font("Segoe UI", 10),
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            Location = new Point(60, 41),
+            Size = new Size(316, 28),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+        };
+
+        dgvCurrentOrderLines = new DataGridView
+        {
+            Location = new Point(16, 84),
+            Size = new Size(360, 280),
+            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
+            ReadOnly = true,
+            AllowUserToAddRows = false,
+            AllowUserToDeleteRows = false,
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+            BackgroundColor = Color.White,
+            BorderStyle = BorderStyle.FixedSingle,
+            RowHeadersVisible = false,
+            Font = new Font("Segoe UI", 9)
+        };
+        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
+        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
+        dgvCurrentOrderLines.EnableHeadersVisualStyles = false;
+        dgvCurrentOrderLines.Columns.Add("Item", "Item");
+        dgvCurrentOrderLines.Columns.Add("Qty", "Qty");
+        dgvCurrentOrderLines.Columns["Qty"].Width = 40;
+        dgvCurrentOrderLines.Columns.Add("Total", "Total");
+        dgvCurrentOrderLines.Columns["Total"].Width = 70;
+        var removeCol = new DataGridViewButtonColumn
+        {
+            Name = "Remove",
+            Text = "X",
+            UseColumnTextForButtonValue = true,
+            Width = 30,
+            FlatStyle = FlatStyle.Flat
+        };
+        dgvCurrentOrderLines.Columns.Add(removeCol);
+        dgvCurrentOrderLines.CellClick += DgvCurrentOrderLines_CellClick;
+
+        lblRunningTotal = new Label
+        {
+            Text = "Total: $0.00",
+            Font = new Font("Segoe UI", 12, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            AutoSize = true,
+            Location = new Point(16, 374),
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+
+        btnPlaceOrder = new Button
+        {
+            Text = "Place Order",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(160, 40),
+            Location = new Point(16, 402),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+        btnPlaceOrder.FlatAppearance.BorderSize = 0;
+        btnPlaceOrder.Click += BtnPlaceOrder_Click;
+
+        btnClearOrder = new Button
+        {
+            Text = "Clear",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Gray400,
+            ForeColor = Color.White,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(90, 40),
+            Location = new Point(184, 402),
+            Cursor = Cursors.Hand,
+            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
+        };
+        btnClearOrder.FlatAppearance.BorderSize = 0;
+        btnClearOrder.Click += BtnClearOrder_Click;
+
+        pnlNewOrderCard.Controls.AddRange(new Control[] {
+            lblNewOrderTitle, lblStay2, cmbStay,
+            dgvCurrentOrderLines, lblRunningTotal,
+            btnPlaceOrder, btnClearOrder
+        });
+
+        // --- Main: categories + cards + menu management (fills remaining space) ---
+        var pnlMain = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(0, 0, 8, 0)
+        };
+
         flpCategoryTabs = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -1217,123 +1327,14 @@ partial class MainForm
 
         pnlMenuActions.Controls.AddRange(new Control[] { btnAddMenuItem, btnEditMenuItem, btnToggleAvail, btnRemoveMenuItem });
 
-        // Order matters: Fill must be added LAST so it gets remaining space
-        split.Panel1.Controls.Add(flpMenuCards);
-        split.Panel1.Controls.Add(pnlMenuActions);
-        split.Panel1.Controls.Add(flpCategoryTabs);
+        // Order matters: Fill must be added LAST so it gets the remaining space.
+        pnlMain.Controls.Add(flpMenuCards);
+        pnlMain.Controls.Add(pnlMenuActions);
+        pnlMain.Controls.Add(flpCategoryTabs);
 
-        // --- Right: order builder card ---
-        var pnlNewOrderCard = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Color.Transparent,
-            Padding = new Padding(8)
-        };
-        pnlNewOrderCard.Paint += DrawingUtilities.PaintCardBackground;
-
-        var lblNewOrderTitle = new Label
-        {
-            Text = "NEW ORDER",
-            Font = new Font("Segoe UI", 12, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
-            AutoSize = true,
-            Location = new Point(16, 12)
-        };
-
-        var lblStay2 = new Label { Text = "Stay:", Font = new Font("Segoe UI", 10), Location = new Point(16, 44), AutoSize = true };
-        cmbStay = new ComboBox
-        {
-            Font = new Font("Segoe UI", 10),
-            DropDownStyle = ComboBoxStyle.DropDownList,
-            Location = new Point(60, 41),
-            Size = new Size(300, 28),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-        };
-
-        dgvCurrentOrderLines = new DataGridView
-        {
-            Location = new Point(16, 84),
-            Size = new Size(344, 280),
-            Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Bottom,
-            ReadOnly = true,
-            AllowUserToAddRows = false,
-            AllowUserToDeleteRows = false,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            BackgroundColor = Color.White,
-            BorderStyle = BorderStyle.FixedSingle,
-            RowHeadersVisible = false,
-            Font = new Font("Segoe UI", 9)
-        };
-        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
-        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
-        dgvCurrentOrderLines.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9, FontStyle.Bold);
-        dgvCurrentOrderLines.EnableHeadersVisualStyles = false;
-        dgvCurrentOrderLines.Columns.Add("Item", "Item");
-        dgvCurrentOrderLines.Columns.Add("Qty", "Qty");
-        dgvCurrentOrderLines.Columns["Qty"].Width = 40;
-        dgvCurrentOrderLines.Columns.Add("Total", "Total");
-        dgvCurrentOrderLines.Columns["Total"].Width = 70;
-        var removeCol = new DataGridViewButtonColumn
-        {
-            Name = "Remove",
-            Text = "X",
-            UseColumnTextForButtonValue = true,
-            Width = 30,
-            FlatStyle = FlatStyle.Flat
-        };
-        dgvCurrentOrderLines.Columns.Add(removeCol);
-        dgvCurrentOrderLines.CellClick += DgvCurrentOrderLines_CellClick;
-
-        lblRunningTotal = new Label
-        {
-            Text = "Total: $0.00",
-            Font = new Font("Segoe UI", 12, FontStyle.Bold),
-            ForeColor = AppColors.Primary,
-            AutoSize = true,
-            Location = new Point(16, 374),
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
-        };
-
-        btnPlaceOrder = new Button
-        {
-            Text = "Place Order",
-            Font = new Font("Segoe UI", 10, FontStyle.Bold),
-            BackColor = AppColors.Accent,
-            ForeColor = AppColors.Primary,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(140, 36),
-            Location = new Point(16, 402),
-            Cursor = Cursors.Hand,
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
-        };
-        btnPlaceOrder.FlatAppearance.BorderSize = 0;
-        btnPlaceOrder.Click += BtnPlaceOrder_Click;
-
-        btnClearOrder = new Button
-        {
-            Text = "Clear",
-            Font = new Font("Segoe UI", 10, FontStyle.Bold),
-            BackColor = AppColors.Gray400,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(80, 36),
-            Location = new Point(162, 402),
-            Cursor = Cursors.Hand,
-            Anchor = AnchorStyles.Bottom | AnchorStyles.Left
-        };
-        btnClearOrder.FlatAppearance.BorderSize = 0;
-        btnClearOrder.Click += BtnClearOrder_Click;
-
-        pnlNewOrderCard.Controls.AddRange(new Control[] {
-            lblNewOrderTitle, lblStay2, cmbStay,
-            dgvCurrentOrderLines, lblRunningTotal,
-            btnPlaceOrder, btnClearOrder
-        });
-
-        split.Panel2.Controls.Add(pnlNewOrderCard);
-
-        tab.Controls.Add(split);
+        // Add to tab — Right docks first so it claims its width, then Fill gets the rest.
+        tab.Controls.Add(pnlMain);
+        tab.Controls.Add(pnlNewOrderCard);
     }
 
     private void BuildActiveOrdersSubTab(TabPage tab)

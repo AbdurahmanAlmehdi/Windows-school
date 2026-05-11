@@ -56,11 +56,7 @@ CREATE TABLE guests (
     name VARCHAR(120) NOT NULL,
     contact VARCHAR(64) NOT NULL,
     passport VARCHAR(64) NOT NULL DEFAULT '',
-    gender ENUM(
-        'Unspecified',
-        'Male',
-        'Female'
-    ) NOT NULL DEFAULT 'Unspecified',
+    gender ENUM('Male', 'Female') NOT NULL DEFAULT 'Male',
     is_vip BOOLEAN NOT NULL DEFAULT FALSE,
     stay_count INT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
@@ -117,11 +113,7 @@ CREATE TABLE reservation_accompanying (
     id INT NOT NULL AUTO_INCREMENT,
     reservation_id INT NOT NULL,
     name VARCHAR(120) NOT NULL,
-    gender ENUM(
-        'Unspecified',
-        'Male',
-        'Female'
-    ) NOT NULL DEFAULT 'Unspecified',
+    gender ENUM('Male', 'Female') NOT NULL DEFAULT 'Male',
     age INT NOT NULL,
     passport VARCHAR(64) NOT NULL DEFAULT '',
     PRIMARY KEY (id),
