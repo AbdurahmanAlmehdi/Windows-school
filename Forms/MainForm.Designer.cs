@@ -1427,14 +1427,15 @@ partial class MainForm
 
         pnlOrdersLeft.Controls.Add(dgvOrders);
         pnlOrdersLeft.Controls.Add(pnlFilterRow);
-        split.Panel1.Controls.Add(pnlOrdersLeft);
 
-        // --- Right: detail panel + action buttons ---
+        // --- Right side contents (detail card on top, actions docked at bottom) ---
         pnlOrderDetail = new Panel
         {
             Dock = DockStyle.Fill,
             BackColor = Color.Transparent,
-            Padding = new Padding(8)
+            Padding = new Padding(8),
+            AutoScroll = true,
+            AutoScrollMinSize = new Size(0, 320)
         };
         pnlOrderDetail.Paint += DrawingUtilities.PaintCardBackground;
 
@@ -1472,7 +1473,7 @@ partial class MainForm
         dgvOrderLines = new DataGridView
         {
             Location = new Point(16, 100),
-            Size = new Size(380, 130),
+            Size = new Size(440, 160),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
             ReadOnly = true,
             AllowUserToAddRows = false,
@@ -1483,7 +1484,8 @@ partial class MainForm
             BorderStyle = BorderStyle.FixedSingle,
             RowHeadersVisible = false,
             Font = new Font("Segoe UI", 9),
-            Visible = false
+            Visible = false,
+            ScrollBars = ScrollBars.Vertical
         };
         dgvOrderLines.ColumnHeadersDefaultCellStyle.BackColor = AppColors.Primary;
         dgvOrderLines.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
@@ -1502,7 +1504,7 @@ partial class MainForm
             Font = new Font("Segoe UI", 12, FontStyle.Bold),
             ForeColor = AppColors.Accent,
             AutoSize = true,
-            Location = new Point(16, 236),
+            Location = new Point(16, 270),
             Visible = false
         };
 
@@ -1566,10 +1568,13 @@ partial class MainForm
 
         pnlOrderActions.Controls.AddRange(new Control[] { btnAdvanceOrder, btnAddItemsToOrder, btnCancelOrder });
 
-        split.Panel2.Controls.Add(pnlOrderDetail);
-        split.Panel2.Controls.Add(pnlOrderActions);
+        // Right sidebar: Fill (detail with scroll) on top of Bottom-docked actions.
+        pnlOrderRight.Controls.Add(pnlOrderDetail);
+        pnlOrderRight.Controls.Add(pnlOrderActions);
 
-        tab.Controls.Add(split);
+        // Right first (claims fixed width), then Fill grabs the rest.
+        tab.Controls.Add(pnlOrdersLeft);
+        tab.Controls.Add(pnlOrderRight);
     }
 
     private void InitFinancesTab()
