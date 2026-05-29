@@ -1,16 +1,35 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0-windows</TargetFramework>
+    <TargetFrameworks>net9.0-windows;net9.0</TargetFrameworks>
     <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>HotelManagement.WinForms</RootNamespace>
+  </PropertyGroup>
+
+  <!-- Windows-only build: produce the actual WinForms executable -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0-windows'">
+    <OutputType>WinExe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 
-  <ItemGroup>
+  <!-- Cross-platform build: library only, no UI (used by the test project on macOS/Linux) -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <OutputType>Library</OutputType>
+  </PropertyGroup>
+
+  <!-- Exclude UI/Drawing code from the cross-platform target -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0'">
+    <Compile Remove="Forms\**" />
+    <EmbeddedResource Remove="Forms\**" />
+    <None Remove="Forms\**" />
+    <Compile Remove="Theme\**" />
+    <Compile Remove="Program.cs" />
+  </ItemGroup>
+
+  <!-- WinForms designer wiring (Windows target only) -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net9.0-windows'">
     <Compile Update="Forms\LoginForm.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -36,6 +55,12 @@
     <None Include="Assets\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="HotelManagement.Tests\**" />
+    <EmbeddedResource Remove="HotelManagement.Tests\**" />
+    <None Remove="HotelManagement.Tests\**" />
   </ItemGroup>
 
 </Project>
