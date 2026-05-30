@@ -60,40 +60,47 @@ dotnet restore HotelManagement.WinForms.csproj
 
 Smallest output (~5 MB). Requires .NET 9 Desktop Runtime on the target.
 
-```cmd
-dotnet publish HotelManagement.WinForms.csproj ^
-  -c Release ^
-  -f net9.0-windows ^
-  -r win-x64 ^
-  --self-contained=false ^
-  -p:PublishSingleFile=true ^
-  -p:IncludeNativeLibrariesForSelfExtract=true ^
-  -o publish\framework-dependent
+Pasted as a single line (works in **both Command Prompt and
+PowerShell**, no fragile line-continuation characters):
+
 ```
+dotnet publish HotelManagement.WinForms.csproj -c Release -f net9.0-windows -r win-x64 --no-self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish\framework-dependent
+```
+
+> **Note.** Newer .NET SDKs (8+) prefer `--no-self-contained` over the
+> older `--self-contained=false`. Both still work on .NET 9 but the
+> switch form is friendlier to PowerShell and to SDK 10's parser.
 
 ### 2.3 Publish flavour B — Self-contained single-file *(recommended for the instructor demo)*
 
 Bigger output (~80 MB). Runs on any Windows 10/11 x64 with **no
 prerequisites**.
 
-```cmd
-dotnet publish HotelManagement.WinForms.csproj ^
-  -c Release ^
-  -f net9.0-windows ^
-  -r win-x64 ^
-  --self-contained=true ^
-  -p:PublishSingleFile=true ^
-  -p:IncludeNativeLibrariesForSelfExtract=true ^
-  -o publish\self-contained
+```
+dotnet publish HotelManagement.WinForms.csproj -c Release -f net9.0-windows -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish\self-contained
 ```
 
 ### 2.4 Publish flavour C — Folder (for debugging)
 
-```cmd
-dotnet publish HotelManagement.WinForms.csproj ^
-  -c Release -f net9.0-windows ^
-  -o publish\folder
 ```
+dotnet publish HotelManagement.WinForms.csproj -c Release -f net9.0-windows -o publish\folder
+```
+
+### 2.5 If your line-continuation character matters
+
+The single-line form above is the safest. If you prefer multi-line for
+readability, the right separator depends on the shell:
+
+| Shell | Continuation | Example |
+|---|---|---|
+| `cmd.exe` | `^` (caret) at end of line | `--self-contained ^` |
+| PowerShell | `` ` `` (backtick) at end of line | `` --self-contained ` `` |
+| bash / zsh (WSL) | `\` (backslash) at end of line | `--self-contained \` |
+
+A `^` in PowerShell is *not* a line-continuation — it would get
+parsed as bitwise XOR and the next line would be treated as a fresh
+command. That's the classic cause of *"the value after the `--` is
+wrong"* errors when copy-pasting a `cmd`-style block into PowerShell.
 
 ### 2.5 Output checklist
 
@@ -217,6 +224,8 @@ Before zipping the publish folder for the instructor:
 | PDF reports show truncated text at the right edge | Locale font fall-back | Reports already render landscape A4 with bundled Lato; if still cropped, install Lato system-wide |
 | First launch hangs ~10 s | QuestPDF initialising | One-time cost; subsequent launches are instant |
 | App reports it cannot find `db\schema_sqlserver.sql` | Files not copied during publish | Re-run publish; verify the `<None Include="db\…"><CopyToOutputDirectory>` items in `HotelManagement.WinForms.csproj` |
+| `dotnet publish` complains *"the value after the `--` is wrong"* on `--self-contained=false ^` | Running a `cmd`-style multi-line command in PowerShell where `^` isn't a continuation | Paste the publish command as a **single line**, or replace `^` with backticks `` ` `` for PowerShell. See §2.5. |
+| `error NETSDK1045: The current .NET SDK does not support targeting .NET 9.0` | SDK 10 installed without the .NET 9 targeting pack | Either install .NET 9 SDK side-by-side (`winget install Microsoft.DotNet.SDK.9`) **or** retarget the csproj to `net10.0-windows`/`net10.0` |
 
 ---
 
