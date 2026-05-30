@@ -84,14 +84,14 @@ INSERT INTO dbo.role_permissions (role_id, resource, [action]) VALUES
     (@role_staff, 'Invoices',     'Update');
 
 -- ---------------------------------------------------------------------
--- users (password_hash is a placeholder; replace with a real
---        BCrypt/Argon2id hash before any production deployment.)
+-- users  (academic build per SRS CON-7: plaintext credentials match the
+--         in-memory SeedData.cs. Replace with real BCrypt/Argon2id hashes
+--         before any production deployment - the column name remains
+--         password_hash to keep that migration painless.)
 -- ---------------------------------------------------------------------
 INSERT INTO dbo.users (user_id, username, password_hash, role_id) VALUES
-    ('22222222-2222-2222-2222-000000000001', N'superadmin',
-        N'$2a$REPLACE_WITH_BCRYPT_HASH_superadmin', @role_super),
-    ('22222222-2222-2222-2222-000000000002', N'staff',
-        N'$2a$REPLACE_WITH_BCRYPT_HASH_staff',      @role_staff);
+    ('22222222-2222-2222-2222-000000000001', N'superadmin', N'superadmin123', @role_super),
+    ('22222222-2222-2222-2222-000000000002', N'staff',      N'staff123',      @role_staff);
 
 -- ---------------------------------------------------------------------
 -- rooms  (room_id encodes the room number for human legibility)
