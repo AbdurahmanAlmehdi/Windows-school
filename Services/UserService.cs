@@ -1,5 +1,6 @@
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Services.Security;
 
 namespace HotelManagement.WinForms.Services;
 
@@ -31,7 +32,12 @@ public class UserService
         if (role == null)
             throw new InvalidOperationException("Role is required.");
 
-        var user = new User { Username = username.Trim(), Password = password, Role = role };
+        var user = new User
+        {
+            Username = username.Trim(),
+            Password = PasswordHasher.Hash(password),
+            Role = role
+        };
         _store.Users.Add(user);
         return user;
     }
@@ -49,7 +55,7 @@ public class UserService
 
         user.Username = username.Trim();
         if (!string.IsNullOrEmpty(newPassword))
-            user.Password = newPassword;
+            user.Password = PasswordHasher.Hash(newPassword);
         user.Role = role;
     }
 

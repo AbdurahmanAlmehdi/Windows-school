@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Services.Security;
 
 namespace HotelManagement.WinForms.Persistence.Repositories;
 
@@ -34,11 +35,15 @@ public sealed class UserRepository
                     $"User '{r.GetString(1)}' references unknown role {roleId}. " +
                     "Load roles before users.");
 
+
+            var stored = r.GetString(2);
+            var passwordHash = PasswordHasher.IsHash(stored) ? stored : PasswordHasher.Hash(stored);
+
             users.Add(new User
             {
                 Id       = r.GetGuid(0),
                 Username = r.GetString(1),
-                Password = r.GetString(2),
+                Password = passwordHash,
                 Role     = role
             });
         }

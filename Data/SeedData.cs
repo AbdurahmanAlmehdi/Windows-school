@@ -1,4 +1,5 @@
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Services.Security;
 
 namespace HotelManagement.WinForms.Data;
 
@@ -6,6 +7,10 @@ public static class SeedData
 {
     private static readonly string MenuPlaceholder =
         Path.Combine(AppContext.BaseDirectory, "Assets", "menu_placeholder.jpg");
+
+
+    private static readonly string SuperAdminPasswordHash = PasswordHasher.Hash("superadmin123");
+    private static readonly string StaffPasswordHash      = PasswordHasher.Hash("staff123");
 
     public static void Populate(DataStore store)
     {
@@ -47,8 +52,8 @@ public static class SeedData
         store.Roles.Add(managerRole);
         store.Roles.Add(staffRole);
 
-        store.Users.Add(new User { Username = "superadmin", Password = "superadmin123", Role = superAdminRole });
-        store.Users.Add(new User { Username = "staff",      Password = "staff123",      Role = staffRole });
+        store.Users.Add(new User { Username = "superadmin", Password = SuperAdminPasswordHash, Role = superAdminRole });
+        store.Users.Add(new User { Username = "staff",      Password = StaffPasswordHash,      Role = staffRole });
 
         // Rooms (floor derived from first digit of room number)
         store.Rooms.Add(new Room { Number = 101, Floor = 1, Type = RoomType.Single, Rate = 99.99m });

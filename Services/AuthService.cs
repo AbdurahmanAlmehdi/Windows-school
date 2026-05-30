@@ -1,5 +1,6 @@
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Services.Security;
 
 namespace HotelManagement.WinForms.Services;
 
@@ -19,10 +20,9 @@ public class AuthService
         if (username == null || password == null) return false;
 
         var user = _store.Users.FirstOrDefault(u =>
-            u.Username.Equals(username, StringComparison.OrdinalIgnoreCase) &&
-            u.Password == password);
+            u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
 
-        if (user != null)
+        if (user != null && PasswordHasher.Verify(password, user.Password))
         {
             CurrentUser = user;
             return true;
