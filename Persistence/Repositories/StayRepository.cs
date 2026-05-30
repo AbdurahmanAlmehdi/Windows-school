@@ -27,6 +27,27 @@ public sealed class StayRepository
              @in, @expected, @actual,
              @roomChg, @restChg, @status);";
 
+    private const string UpsertSql = @"
+        IF EXISTS (SELECT 1 FROM dbo.stays WHERE stay_id = @id)
+            UPDATE dbo.stays
+               SET guest_id = @guest, room_id = @room,
+                   check_in_date = @in, expected_check_out = @expected,
+                   actual_check_out = @actual,
+                   room_charges = @roomChg, restaurant_charges = @restChg,
+                   status = @status
+             WHERE stay_id = @id;
+        ELSE
+            INSERT INTO dbo.stays
+                (stay_id, guest_id, room_id, reservation_id,
+                 check_in_date, expected_check_out, actual_check_out,
+                 room_charges, restaurant_charges, status)
+            VALUES
+                (@id, @guest, @room, NULL,
+                 @in, @expected, @actual,
+                 @roomChg, @restChg, @status);";
+
+    private const string DeleteSql = @"DELETE FROM dbo.stays WHERE stay_id = @id;";
+
     public List<Stay> GetAll(
         IReadOnlyDictionary<Guid, Guest> guestsById,
         IReadOnlyDictionary<Guid, Room>  roomsById)
@@ -68,9 +89,22 @@ public sealed class StayRepository
         cmd.ExecuteNonQuery();
     }
 
-    public void Insert(Stay stay, SqlConnection c, SqlTransaction tx)
+    public void Insert(Stay stay, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(InsertSql, stay, c, tx);
+
+    public void Upsert(Stay stay, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(UpsertSql, stay, c, tx);
+
+    public void Delete(Stay stay, SqlConnection c, SqlTransaction tx)
     {
-        using var cmd = new SqlCommand(InsertSql, c, tx);
+        using var cmd = new SqlCommand(DeleteSql, c, tx);
+        cmd.Parameters.AddWithValue("@id", stay.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void ExecuteWrite(string sql, Stay stay, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
         cmd.Parameters.AddWithValue("@id",       stay.Id);
         cmd.Parameters.AddWithValue("@guest",    stay.Guest.Id);
         cmd.Parameters.AddWithValue("@room",     stay.Room.Id);

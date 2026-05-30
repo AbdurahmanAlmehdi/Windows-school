@@ -39,9 +39,13 @@ public sealed class InvoicePdf : IDocument
         container.Page(page =>
         {
             page.Size(PageSizes.A4);
-            page.Margin(40);
+            page.Margin(28);
             page.PageColor(Colors.White);
-            page.DefaultTextStyle(t => t.FontFamily(Fonts.SegoeUI).FontSize(10));
+            // Intentionally NOT setting FontFamily - QuestPDF embeds Lato by
+            // default, which renders identically across Windows/Mac/Linux.
+            // Setting Segoe UI here previously caused right-side clipping on
+            // systems that fell back to a wider substitute font.
+            page.DefaultTextStyle(t => t.FontSize(10));
 
             page.Header().Element(ComposeHeader);
             page.Content().Element(ComposeContent);

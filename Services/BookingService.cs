@@ -1,5 +1,6 @@
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Persistence;
 
 namespace HotelManagement.WinForms.Services;
 
@@ -7,11 +8,16 @@ public class BookingService
 {
     private readonly DataStore _store;
     private readonly RoomService _roomService;
+    private readonly IPersistenceContext _persistence;
 
-    public BookingService(DataStore store, RoomService roomService)
+    public BookingService(
+        DataStore store,
+        RoomService roomService,
+        IPersistenceContext? persistence = null)
     {
         _store = store;
         _roomService = roomService;
+        _persistence = persistence ?? NullPersistenceContext.Instance;
     }
 
     public Reservation CreateReservation(
@@ -57,6 +63,18 @@ public class BookingService
             throw new InvalidOperationException(
                 $"Room {room.Number} already has a reservation that overlaps these dates.");
 
+        // New guests are persisted before the reservation that references them
+        // so the FK insert order is correct on the SQL side.
+        if (!_store.Guests.Contains(guest))
+        {
+            _store.Guests.Add(guest);
+            _persistence.SaveGuest(guest);
+        }
+        else
+        {
+            _persistence.SaveGuest(guest);
+        }
+
         var reservation = new Reservation
         {
             Guest = guest,
@@ -68,6 +86,7 @@ public class BookingService
             MarriageCertificateId = marriageCertificateId
         };
         _store.Reservations.Add(reservation);
+        _persistence.SaveReservation(reservation);
         return reservation;
     }
 
@@ -84,7 +103,9 @@ public class BookingService
                 $"Room {reservation.Room.Number} is already occupied by another stay.");
 
         reservation.Status = ReservationStatus.CheckedIn;
-        _roomService.MarkOccupied(reservation.Room);
+        _persistence.SaveReservation(reservation);
+
+        _roomService.MarkOccupied(reservation.Room); // writes Room through
 
         var stay = new Stay
         {
@@ -95,6 +116,7 @@ public class BookingService
             Status = StayStatus.Active
         };
         _store.Stays.Add(stay);
+        _persistence.SaveStay(stay);
         return stay;
     }
 
@@ -114,14 +136,19 @@ public class BookingService
             .Where(o => o.Stay == stay && o.Status != OrderStatus.Cancelled)
             .Sum(o => o.Total);
 
-        _roomService.MarkVacant(stay.Room);
-        _roomService.MarkNeedsCleaning(stay.Room);
+        _roomService.MarkVacant(stay.Room);          // writes Room through
+        _roomService.MarkNeedsCleaning(stay.Room);   // writes Room through
         stay.Guest.StayCount++;
+        _persistence.SaveGuest(stay.Guest);
+        _persistence.SaveStay(stay);
 
         var reservation = _store.Reservations.FirstOrDefault(r =>
             r.Guest == stay.Guest && r.Room == stay.Room && r.Status == ReservationStatus.CheckedIn);
         if (reservation != null)
+        {
             reservation.Status = ReservationStatus.Completed;
+            _persistence.SaveReservation(reservation);
+        }
 
         return stay.TotalCharges;
     }
@@ -129,5 +156,6 @@ public class BookingService
     public void Cancel(Reservation reservation)
     {
         reservation.Status = ReservationStatus.Cancelled;
+        _persistence.SaveReservation(reservation);
     }
 }

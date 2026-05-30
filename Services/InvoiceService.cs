@@ -1,15 +1,18 @@
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Persistence;
 
 namespace HotelManagement.WinForms.Services;
 
 public class InvoiceService
 {
     private readonly DataStore _store;
+    private readonly IPersistenceContext _persistence;
 
-    public InvoiceService(DataStore store)
+    public InvoiceService(DataStore store, IPersistenceContext? persistence = null)
     {
         _store = store;
+        _persistence = persistence ?? NullPersistenceContext.Instance;
     }
 
     public Invoice GenerateInvoice(Stay stay)
@@ -54,6 +57,7 @@ public class InvoiceService
         }
 
         _store.Invoices.Add(invoice);
+        _persistence.SaveInvoice(invoice);
         return invoice;
     }
 
@@ -62,6 +66,7 @@ public class InvoiceService
         invoice.PaymentStatus = PaymentStatus.Paid;
         invoice.PaymentMethod = method;
         invoice.PaymentDate = DateTime.Now;
+        _persistence.SaveInvoice(invoice);
     }
 
     public void MarkRefunded(Invoice invoice)
@@ -72,6 +77,7 @@ public class InvoiceService
                 $"Invoice {invoice.InvoiceNumber} is {invoice.PaymentStatus}; only Paid invoices can be refunded.");
 
         invoice.PaymentStatus = PaymentStatus.Refunded;
+        _persistence.SaveInvoice(invoice);
     }
 
     public decimal GetTotalRevenue()

@@ -29,6 +29,26 @@ public sealed class ReservationRepository
         VALUES
             (@id, @guest, @room, @in, @out, @status, @cert);";
 
+    private const string UpsertReservation = @"
+        IF EXISTS (SELECT 1 FROM dbo.reservations WHERE reservation_id = @id)
+            UPDATE dbo.reservations
+               SET guest_id = @guest, room_id = @room,
+                   check_in_date = @in, check_out_date = @out,
+                   status = @status, marriage_certificate_id = @cert
+             WHERE reservation_id = @id;
+        ELSE
+            INSERT INTO dbo.reservations
+                (reservation_id, guest_id, room_id, check_in_date, check_out_date,
+                 status, marriage_certificate_id)
+            VALUES
+                (@id, @guest, @room, @in, @out, @status, @cert);";
+
+    private const string DeleteAccompanyingByReservation =
+        @"DELETE FROM dbo.reservation_accompanying WHERE reservation_id = @id;";
+
+    private const string DeleteReservation =
+        @"DELETE FROM dbo.reservations WHERE reservation_id = @id;";
+
     private const string InsertAccompanying = @"
         INSERT INTO dbo.reservation_accompanying
             (accompanying_id, reservation_id, name, gender, age, passport)
@@ -105,20 +125,50 @@ public sealed class ReservationRepository
 
     public void Insert(Reservation res, SqlConnection c, SqlTransaction tx)
     {
-        using (var cmd = new SqlCommand(InsertReservation, c, tx))
+        WriteParent(InsertReservation, res, c, tx);
+        InsertChildren(res, c, tx);
+    }
+
+    public void Upsert(Reservation res, SqlConnection c, SqlTransaction tx)
+    {
+        WriteParent(UpsertReservation, res, c, tx);
+        // Reservation accompanying is a "child list" managed by the parent:
+        // clear and re-insert is simpler than diffing rows and matches the
+        // semantics of how the dialog edits the list as a whole.
+        using (var cmd = new SqlCommand(DeleteAccompanyingByReservation, c, tx))
         {
-            cmd.Parameters.AddWithValue("@id",     res.Id);
-            cmd.Parameters.AddWithValue("@guest",  res.Guest.Id);
-            cmd.Parameters.AddWithValue("@room",   res.Room.Id);
-            cmd.Parameters.AddWithValue("@in",     res.CheckInDate.Date);
-            cmd.Parameters.AddWithValue("@out",    res.CheckOutDate.Date);
-            cmd.Parameters.AddWithValue("@status", res.Status.ToString());
-            cmd.Parameters.AddWithValue("@cert",
-                string.IsNullOrEmpty(res.MarriageCertificateId)
-                    ? DBNull.Value : (object)res.MarriageCertificateId);
+            cmd.Parameters.AddWithValue("@id", res.Id);
             cmd.ExecuteNonQuery();
         }
+        InsertChildren(res, c, tx);
+    }
 
+    public void Delete(Reservation res, SqlConnection c, SqlTransaction tx)
+    {
+        // reservation_accompanying has ON DELETE CASCADE so the children
+        // disappear with the parent.
+        using var cmd = new SqlCommand(DeleteReservation, c, tx);
+        cmd.Parameters.AddWithValue("@id", res.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void WriteParent(string sql, Reservation res, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
+        cmd.Parameters.AddWithValue("@id",     res.Id);
+        cmd.Parameters.AddWithValue("@guest",  res.Guest.Id);
+        cmd.Parameters.AddWithValue("@room",   res.Room.Id);
+        cmd.Parameters.AddWithValue("@in",     res.CheckInDate.Date);
+        cmd.Parameters.AddWithValue("@out",    res.CheckOutDate.Date);
+        cmd.Parameters.AddWithValue("@status", res.Status.ToString());
+        cmd.Parameters.AddWithValue("@cert",
+            string.IsNullOrEmpty(res.MarriageCertificateId)
+                ? DBNull.Value : (object)res.MarriageCertificateId);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void InsertChildren(Reservation res, SqlConnection c, SqlTransaction tx)
+    {
         foreach (var person in res.Accompanying)
         {
             using var cmd = new SqlCommand(InsertAccompanying, c, tx);

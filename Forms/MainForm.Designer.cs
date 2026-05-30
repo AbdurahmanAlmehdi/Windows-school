@@ -1027,6 +1027,8 @@ partial class MainForm
         };
 
         // Primary CTA for the Rooms tab - reserve this room (mid-term UI feedback).
+        // Sits BELOW the condition action buttons so it never collides with
+        // the maintenance label (which can grow to multiple lines).
         btnReserveRoom = new Button
         {
             Text = "Reserve This Room",
@@ -1034,8 +1036,8 @@ partial class MainForm
             BackColor = AppColors.Accent,
             ForeColor = AppColors.Primary,
             FlatStyle = FlatStyle.Flat,
-            Size = new Size(288, 40),
-            Location = new Point(20, 170),
+            Size = new Size(288, 44),
+            Location = new Point(20, 320),
             Cursor = Cursors.Hand,
             Visible = false
         };

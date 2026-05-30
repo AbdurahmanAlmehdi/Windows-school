@@ -21,6 +21,20 @@ public sealed class MenuItemRepository
         VALUES
             (@id, @name, @price, @category, @avail, @description, @image);";
 
+    private const string UpsertSql = @"
+        IF EXISTS (SELECT 1 FROM dbo.menu_items WHERE menu_item_id = @id)
+            UPDATE dbo.menu_items
+               SET name = @name, price = @price, category = @category,
+                   is_available = @avail, description = @description, image_path = @image
+             WHERE menu_item_id = @id;
+        ELSE
+            INSERT INTO dbo.menu_items
+                (menu_item_id, name, price, category, is_available, description, image_path)
+            VALUES
+                (@id, @name, @price, @category, @avail, @description, @image);";
+
+    private const string DeleteSql = @"DELETE FROM dbo.menu_items WHERE menu_item_id = @id;";
+
     public List<MenuItem> GetAll()
     {
         using var c = _db.Open();
@@ -50,9 +64,22 @@ public sealed class MenuItemRepository
         cmd.ExecuteNonQuery();
     }
 
-    public void Insert(MenuItem item, SqlConnection c, SqlTransaction tx)
+    public void Insert(MenuItem item, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(InsertSql, item, c, tx);
+
+    public void Upsert(MenuItem item, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(UpsertSql, item, c, tx);
+
+    public void Delete(MenuItem item, SqlConnection c, SqlTransaction tx)
     {
-        using var cmd = new SqlCommand(InsertSql, c, tx);
+        using var cmd = new SqlCommand(DeleteSql, c, tx);
+        cmd.Parameters.AddWithValue("@id", item.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void ExecuteWrite(string sql, MenuItem item, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
         cmd.Parameters.AddWithValue("@id",       item.Id);
         cmd.Parameters.AddWithValue("@name",     item.Name);
         cmd.Parameters.AddWithValue("@price",    item.Price);

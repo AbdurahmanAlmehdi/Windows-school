@@ -21,6 +21,20 @@ public sealed class RoomRepository
         VALUES
             (@id, @number, @floor, @type, @rate, @occupied, @condition, @log);";
 
+    private const string UpsertSql = @"
+        IF EXISTS (SELECT 1 FROM dbo.rooms WHERE room_id = @id)
+            UPDATE dbo.rooms
+               SET number = @number, floor = @floor, type = @type, rate = @rate,
+                   is_occupied = @occupied, [condition] = @condition, maintenance_log = @log
+             WHERE room_id = @id;
+        ELSE
+            INSERT INTO dbo.rooms
+                (room_id, number, floor, type, rate, is_occupied, [condition], maintenance_log)
+            VALUES
+                (@id, @number, @floor, @type, @rate, @occupied, @condition, @log);";
+
+    private const string DeleteSql = @"DELETE FROM dbo.rooms WHERE room_id = @id;";
+
     public List<Room> GetAll()
     {
         using var c = _db.Open();
@@ -51,9 +65,22 @@ public sealed class RoomRepository
         cmd.ExecuteNonQuery();
     }
 
-    public void Insert(Room room, SqlConnection c, SqlTransaction tx)
+    public void Insert(Room room, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(InsertSql, room, c, tx);
+
+    public void Upsert(Room room, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(UpsertSql, room, c, tx);
+
+    public void Delete(Room room, SqlConnection c, SqlTransaction tx)
     {
-        using var cmd = new SqlCommand(InsertSql, c, tx);
+        using var cmd = new SqlCommand(DeleteSql, c, tx);
+        cmd.Parameters.AddWithValue("@id", room.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void ExecuteWrite(string sql, Room room, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
         cmd.Parameters.AddWithValue("@id",        room.Id);
         cmd.Parameters.AddWithValue("@number",    room.Number);
         cmd.Parameters.AddWithValue("@floor",     room.Floor);

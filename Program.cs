@@ -12,11 +12,12 @@ static class Program
     {
         ApplicationConfiguration.Initialize();
 
+        // QuestPDF is licensed Community for this build (academic / non-commercial).
         QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
 
         var config = AppConfig.Load();
         var dataStore = new DataStore();
-        PersistenceManager? persistence = null;
+        IPersistenceContext persistence = NullPersistenceContext.Instance;
 
         if (config.IsSqlServer)
         {
@@ -26,8 +27,14 @@ static class Program
                 bootstrap.EnsureReady();
 
                 var db = new SqlDb(config.ConnectionString);
-                persistence = new PersistenceManager(db);
-                persistence.LoadInto(dataStore);
+
+                // Initial load: replace the in-memory seed with what SQL holds.
+                var loader = new PersistenceManager(db);
+                loader.LoadInto(dataStore);
+
+                // Subsequent mutations write through this context, so every
+                // service-layer change persists to SQL Server immediately.
+                persistence = new SqlPersistenceContext(db);
             }
             catch (Exception ex)
             {
@@ -36,17 +43,17 @@ static class Program
                     "SQL Server unavailable",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Warning);
-                persistence = null;
+                persistence = NullPersistenceContext.Instance;
             }
         }
 
-        var authService = new AuthService(dataStore);
-        var roomService = new RoomService(dataStore, authService);
-        var bookingService = new BookingService(dataStore, roomService);
-        var restaurantService = new RestaurantService(dataStore, authService);
-        var reportService = new ReportService(dataStore);
-        var invoiceService = new InvoiceService(dataStore);
-        var userService = new UserService(dataStore, authService);
+        var authService       = new AuthService(dataStore);
+        var roomService       = new RoomService(dataStore, authService, persistence);
+        var bookingService    = new BookingService(dataStore, roomService, persistence);
+        var restaurantService = new RestaurantService(dataStore, authService, persistence);
+        var reportService     = new ReportService(dataStore);
+        var invoiceService    = new InvoiceService(dataStore, persistence);
+        var userService       = new UserService(dataStore, authService, persistence);
 
         using var loginForm = new LoginForm(authService);
         Application.Run(loginForm);
@@ -56,7 +63,7 @@ static class Program
             Application.Run(new MainForm(
                 authService, roomService, bookingService,
                 restaurantService, reportService, invoiceService,
-                userService, dataStore, persistence));
+                userService, dataStore));
         }
     }
 }

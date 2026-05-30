@@ -21,6 +21,20 @@ public sealed class GuestRepository
         VALUES
             (@id, @name, @contact, @passport, @gender, @vip, @stays);";
 
+    private const string UpsertSql = @"
+        IF EXISTS (SELECT 1 FROM dbo.guests WHERE guest_id = @id)
+            UPDATE dbo.guests
+               SET name = @name, contact = @contact, passport = @passport,
+                   gender = @gender, is_vip = @vip, stay_count = @stays
+             WHERE guest_id = @id;
+        ELSE
+            INSERT INTO dbo.guests
+                (guest_id, name, contact, passport, gender, is_vip, stay_count)
+            VALUES
+                (@id, @name, @contact, @passport, @gender, @vip, @stays);";
+
+    private const string DeleteSql = @"DELETE FROM dbo.guests WHERE guest_id = @id;";
+
     public List<Guest> GetAll()
     {
         using var c = _db.Open();
@@ -50,9 +64,22 @@ public sealed class GuestRepository
         cmd.ExecuteNonQuery();
     }
 
-    public void Insert(Guest guest, SqlConnection c, SqlTransaction tx)
+    public void Insert(Guest guest, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(InsertSql, guest, c, tx);
+
+    public void Upsert(Guest guest, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(UpsertSql, guest, c, tx);
+
+    public void Delete(Guest guest, SqlConnection c, SqlTransaction tx)
     {
-        using var cmd = new SqlCommand(InsertSql, c, tx);
+        using var cmd = new SqlCommand(DeleteSql, c, tx);
+        cmd.Parameters.AddWithValue("@id", guest.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void ExecuteWrite(string sql, Guest guest, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
         cmd.Parameters.AddWithValue("@id",       guest.Id);
         cmd.Parameters.AddWithValue("@name",     guest.Name);
         cmd.Parameters.AddWithValue("@contact",

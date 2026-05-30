@@ -17,7 +17,6 @@ public partial class MainForm : Form
     private readonly InvoiceService _invoiceService;
     private readonly UserService _userService;
     private readonly DataStore _store;
-    private readonly PersistenceManager? _persistence;
 
     private Room? _selectedRoom;
     private Models.MenuItem? _selectedMenuItem;
@@ -31,8 +30,7 @@ public partial class MainForm : Form
         ReportService reportService,
         InvoiceService invoiceService,
         UserService userService,
-        DataStore dataStore,
-        PersistenceManager? persistence = null)
+        DataStore dataStore)
     {
         _authService = authService;
         _roomService = roomService;
@@ -42,7 +40,6 @@ public partial class MainForm : Form
         _invoiceService = invoiceService;
         _userService = userService;
         _store = dataStore;
-        _persistence = persistence;
 
         InitializeComponent();
 
@@ -51,8 +48,9 @@ public partial class MainForm : Form
         // Position logout button
         btnLogout.Location = new Point(panelHeader.Width - btnLogout.Width - 12, 8);
 
-        btnSaveSql.Location = new Point(btnLogout.Location.X - btnSaveSql.Width - 8, 8);
-        btnSaveSql.Visible = _persistence != null;
+        // Write-through persistence makes the manual SQL-save button obsolete;
+        // we keep the designer reference but never show it.
+        btnSaveSql.Visible = false;
 
         // Reports tab now contains the PDF export buttons (Phase 4), so it
         // stays visible for any signed-in user.
@@ -101,30 +99,8 @@ public partial class MainForm : Form
 
     private void BtnSaveSql_Click(object? sender, EventArgs e)
     {
-        if (_persistence == null) return;
-
-        try
-        {
-            Cursor = Cursors.WaitCursor;
-            _persistence.SaveFrom(_store);
-            MessageBox.Show(this,
-                "All in-memory data has been written to SQL Server.",
-                "Saved",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this,
-                $"Could not save to SQL Server.\n\n{ex.Message}",
-                "Save failed",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
-        }
-        finally
-        {
-            Cursor = Cursors.Default;
-        }
+        // Write-through persistence makes this a no-op. Kept so the designer
+        // wiring still resolves; the button is hidden in the constructor.
     }
 
     // ===================== DASHBOARD =====================
@@ -855,8 +831,11 @@ public partial class MainForm : Form
             lblRoomDetailMaintenance.Visible = true;
         }
 
-        btnReserveRoom.Visible = room.IsAvailable
-            && _authService.Can(PermissionResource.Reservations, PermissionAction.Create);
+        // Visible for ANY room the user can book - future reservations on
+        // currently-occupied rooms are valid; BookingService rejects
+        // overlapping dates.
+        btnReserveRoom.Visible =
+            _authService.Can(PermissionResource.Reservations, PermissionAction.Create);
 
         // Show condition buttons
         btnMarkClean.Visible = true;
@@ -867,14 +846,9 @@ public partial class MainForm : Form
     private void BtnReserveRoom_Click(object? sender, EventArgs e)
     {
         if (_selectedRoom == null) return;
-        if (!_selectedRoom.IsAvailable)
-        {
-            MessageBox.Show(this,
-                $"Room {_selectedRoom.Number} is not available for booking.",
-                "Unavailable", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
 
+        // Any room may be reserved for future dates; BookingService validates
+        // against overlapping reservations.
         using var dlg = new ReservationDialog(_store, _roomService, _bookingService, _selectedRoom);
         if (dlg.ShowDialog(this) == DialogResult.OK)
         {

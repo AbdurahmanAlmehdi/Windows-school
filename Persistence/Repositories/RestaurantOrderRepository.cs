@@ -26,6 +26,18 @@ public sealed class RestaurantOrderRepository
         INSERT INTO dbo.restaurant_orders (order_id, stay_id, status, created_at)
         VALUES (@id, @stay, @status, @created);";
 
+    private const string UpsertOrder = @"
+        IF EXISTS (SELECT 1 FROM dbo.restaurant_orders WHERE order_id = @id)
+            UPDATE dbo.restaurant_orders
+               SET stay_id = @stay, status = @status, created_at = @created
+             WHERE order_id = @id;
+        ELSE
+            INSERT INTO dbo.restaurant_orders (order_id, stay_id, status, created_at)
+            VALUES (@id, @stay, @status, @created);";
+
+    private const string DeleteLinesByOrder = @"DELETE FROM dbo.order_lines WHERE order_id = @id;";
+    private const string DeleteOrder        = @"DELETE FROM dbo.restaurant_orders WHERE order_id = @id;";
+
     private const string InsertLine = @"
         INSERT INTO dbo.order_lines (line_id, order_id, menu_item_id, quantity, notes)
         VALUES (@id, @order, @item, @qty, @notes);";
@@ -94,15 +106,41 @@ public sealed class RestaurantOrderRepository
 
     public void Insert(RestaurantOrder order, SqlConnection c, SqlTransaction tx)
     {
-        using (var cmd = new SqlCommand(InsertOrder, c, tx))
+        WriteParent(InsertOrder, order, c, tx);
+        InsertChildren(order, c, tx);
+    }
+
+    public void Upsert(RestaurantOrder order, SqlConnection c, SqlTransaction tx)
+    {
+        WriteParent(UpsertOrder, order, c, tx);
+        using (var cmd = new SqlCommand(DeleteLinesByOrder, c, tx))
         {
-            cmd.Parameters.AddWithValue("@id",      order.Id);
-            cmd.Parameters.AddWithValue("@stay",    order.Stay.Id);
-            cmd.Parameters.AddWithValue("@status",  order.Status.ToString());
-            cmd.Parameters.AddWithValue("@created", order.CreatedAt);
+            cmd.Parameters.AddWithValue("@id", order.Id);
             cmd.ExecuteNonQuery();
         }
+        InsertChildren(order, c, tx);
+    }
 
+    public void Delete(RestaurantOrder order, SqlConnection c, SqlTransaction tx)
+    {
+        // order_lines cascades on order delete.
+        using var cmd = new SqlCommand(DeleteOrder, c, tx);
+        cmd.Parameters.AddWithValue("@id", order.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void WriteParent(string sql, RestaurantOrder order, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
+        cmd.Parameters.AddWithValue("@id",      order.Id);
+        cmd.Parameters.AddWithValue("@stay",    order.Stay.Id);
+        cmd.Parameters.AddWithValue("@status",  order.Status.ToString());
+        cmd.Parameters.AddWithValue("@created", order.CreatedAt);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void InsertChildren(RestaurantOrder order, SqlConnection c, SqlTransaction tx)
+    {
         foreach (var line in order.Lines)
         {
             using var cmd = new SqlCommand(InsertLine, c, tx);

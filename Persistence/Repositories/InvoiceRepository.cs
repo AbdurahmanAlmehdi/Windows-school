@@ -31,6 +31,24 @@ public sealed class InvoiceRepository
             (@id, @number, @stay, @guest, @room,
              @date, @status, @method, @paid);";
 
+    private const string UpsertInvoice = @"
+        IF EXISTS (SELECT 1 FROM dbo.invoices WHERE invoice_id = @id)
+            UPDATE dbo.invoices
+               SET invoice_number = @number, stay_id = @stay, guest_id = @guest, room_id = @room,
+                   invoice_date = @date, payment_status = @status,
+                   payment_method = @method, payment_date = @paid
+             WHERE invoice_id = @id;
+        ELSE
+            INSERT INTO dbo.invoices
+                (invoice_id, invoice_number, stay_id, guest_id, room_id,
+                 invoice_date, payment_status, payment_method, payment_date)
+            VALUES
+                (@id, @number, @stay, @guest, @room,
+                 @date, @status, @method, @paid);";
+
+    private const string DeleteLinesByInvoice = @"DELETE FROM dbo.invoice_lines WHERE invoice_id = @id;";
+    private const string DeleteInvoice        = @"DELETE FROM dbo.invoices WHERE invoice_id = @id;";
+
     private const string InsertLine = @"
         INSERT INTO dbo.invoice_lines
             (line_id, invoice_id, description, quantity, unit_price, category)
@@ -120,22 +138,48 @@ public sealed class InvoiceRepository
 
     public void Insert(Invoice invoice, SqlConnection c, SqlTransaction tx)
     {
-        using (var cmd = new SqlCommand(InsertInvoice, c, tx))
+        WriteParent(InsertInvoice, invoice, c, tx);
+        InsertChildren(invoice, c, tx);
+    }
+
+    public void Upsert(Invoice invoice, SqlConnection c, SqlTransaction tx)
+    {
+        WriteParent(UpsertInvoice, invoice, c, tx);
+        using (var cmd = new SqlCommand(DeleteLinesByInvoice, c, tx))
         {
-            cmd.Parameters.AddWithValue("@id",     invoice.Id);
-            cmd.Parameters.AddWithValue("@number", invoice.InvoiceNumber);
-            cmd.Parameters.AddWithValue("@stay",   invoice.Stay.Id);
-            cmd.Parameters.AddWithValue("@guest",  invoice.Guest.Id);
-            cmd.Parameters.AddWithValue("@room",   invoice.Room.Id);
-            cmd.Parameters.AddWithValue("@date",   invoice.InvoiceDate);
-            cmd.Parameters.AddWithValue("@status", invoice.PaymentStatus.ToString());
-            cmd.Parameters.AddWithValue("@method",
-                invoice.PaymentMethod.HasValue ? (object)invoice.PaymentMethod.Value.ToString() : DBNull.Value);
-            cmd.Parameters.AddWithValue("@paid",
-                invoice.PaymentDate.HasValue ? (object)invoice.PaymentDate.Value : DBNull.Value);
+            cmd.Parameters.AddWithValue("@id", invoice.Id);
             cmd.ExecuteNonQuery();
         }
+        InsertChildren(invoice, c, tx);
+    }
 
+    public void Delete(Invoice invoice, SqlConnection c, SqlTransaction tx)
+    {
+        // invoice_lines cascades on invoice delete.
+        using var cmd = new SqlCommand(DeleteInvoice, c, tx);
+        cmd.Parameters.AddWithValue("@id", invoice.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void WriteParent(string sql, Invoice invoice, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
+        cmd.Parameters.AddWithValue("@id",     invoice.Id);
+        cmd.Parameters.AddWithValue("@number", invoice.InvoiceNumber);
+        cmd.Parameters.AddWithValue("@stay",   invoice.Stay.Id);
+        cmd.Parameters.AddWithValue("@guest",  invoice.Guest.Id);
+        cmd.Parameters.AddWithValue("@room",   invoice.Room.Id);
+        cmd.Parameters.AddWithValue("@date",   invoice.InvoiceDate);
+        cmd.Parameters.AddWithValue("@status", invoice.PaymentStatus.ToString());
+        cmd.Parameters.AddWithValue("@method",
+            invoice.PaymentMethod.HasValue ? (object)invoice.PaymentMethod.Value.ToString() : DBNull.Value);
+        cmd.Parameters.AddWithValue("@paid",
+            invoice.PaymentDate.HasValue ? (object)invoice.PaymentDate.Value : DBNull.Value);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void InsertChildren(Invoice invoice, SqlConnection c, SqlTransaction tx)
+    {
         foreach (var line in invoice.Lines)
         {
             using var cmd = new SqlCommand(InsertLine, c, tx);

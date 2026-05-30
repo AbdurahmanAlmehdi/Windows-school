@@ -25,6 +25,18 @@ public sealed class RoleRepository
         INSERT INTO dbo.roles (role_id, name, is_system)
         VALUES (@id, @name, @sys);";
 
+    private const string UpsertRole = @"
+        IF EXISTS (SELECT 1 FROM dbo.roles WHERE role_id = @id)
+            UPDATE dbo.roles SET name = @name, is_system = @sys WHERE role_id = @id;
+        ELSE
+            INSERT INTO dbo.roles (role_id, name, is_system) VALUES (@id, @name, @sys);";
+
+    private const string DeletePermissionsForRole =
+        @"DELETE FROM dbo.role_permissions WHERE role_id = @id;";
+
+    private const string DeleteRole =
+        @"DELETE FROM dbo.roles WHERE role_id = @id;";
+
     private const string InsertPermission = @"
         INSERT INTO dbo.role_permissions (role_id, resource, [action])
         VALUES (@role, @resource, @action);";
@@ -81,14 +93,40 @@ public sealed class RoleRepository
 
     public void Insert(Role role, SqlConnection c, SqlTransaction tx)
     {
-        using (var cmd = new SqlCommand(InsertRole, c, tx))
+        WriteRole(InsertRole, role, c, tx);
+        InsertPermissions(role, c, tx);
+    }
+
+    public void Upsert(Role role, SqlConnection c, SqlTransaction tx)
+    {
+        WriteRole(UpsertRole, role, c, tx);
+        using (var cmd = new SqlCommand(DeletePermissionsForRole, c, tx))
         {
-            cmd.Parameters.AddWithValue("@id",   role.Id);
-            cmd.Parameters.AddWithValue("@name", role.Name);
-            cmd.Parameters.AddWithValue("@sys",  role.IsSystem);
+            cmd.Parameters.AddWithValue("@id", role.Id);
             cmd.ExecuteNonQuery();
         }
+        InsertPermissions(role, c, tx);
+    }
 
+    public void Delete(Role role, SqlConnection c, SqlTransaction tx)
+    {
+        // role_permissions cascades on role delete.
+        using var cmd = new SqlCommand(DeleteRole, c, tx);
+        cmd.Parameters.AddWithValue("@id", role.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void WriteRole(string sql, Role role, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
+        cmd.Parameters.AddWithValue("@id",   role.Id);
+        cmd.Parameters.AddWithValue("@name", role.Name);
+        cmd.Parameters.AddWithValue("@sys",  role.IsSystem);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void InsertPermissions(Role role, SqlConnection c, SqlTransaction tx)
+    {
         foreach (var p in role.Permissions)
         {
             using var cmd = new SqlCommand(InsertPermission, c, tx);

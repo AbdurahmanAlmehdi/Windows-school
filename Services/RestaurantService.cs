@@ -1,5 +1,6 @@
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Persistence;
 
 namespace HotelManagement.WinForms.Services;
 
@@ -7,11 +8,16 @@ public class RestaurantService
 {
     private readonly DataStore _store;
     private readonly AuthService _auth;
+    private readonly IPersistenceContext _persistence;
 
-    public RestaurantService(DataStore store, AuthService auth)
+    public RestaurantService(
+        DataStore store,
+        AuthService auth,
+        IPersistenceContext? persistence = null)
     {
         _store = store;
         _auth = auth;
+        _persistence = persistence ?? NullPersistenceContext.Instance;
     }
 
     public RestaurantOrder CreateOrder(Stay stay, IEnumerable<OrderLine> lines)
@@ -38,6 +44,7 @@ public class RestaurantService
             order.Lines.Add(line);
 
         _store.Orders.Add(order);
+        _persistence.SaveOrder(order);
         return order;
     }
 
@@ -48,13 +55,18 @@ public class RestaurantService
             throw new InvalidOperationException(
                 "Cannot advance a cancelled order.");
 
-        order.Status = order.Status switch
+        var next = order.Status switch
         {
             OrderStatus.Placed    => OrderStatus.Preparing,
             OrderStatus.Preparing => OrderStatus.Ready,
             OrderStatus.Ready     => OrderStatus.Served,
             _                     => order.Status // Served: silent no-op (legal terminal state)
         };
+
+        if (next == order.Status) return;
+
+        order.Status = next;
+        _persistence.SaveOrder(order);
     }
 
     public void CancelOrder(RestaurantOrder order)
@@ -65,6 +77,7 @@ public class RestaurantService
             return;
 
         order.Status = OrderStatus.Cancelled;
+        _persistence.SaveOrder(order);
 
         // Cancelled orders must not contribute to the stay's restaurant charges.
         RecomputeStayCharges(order.Stay);
@@ -77,12 +90,14 @@ public class RestaurantService
     {
         _auth.Require(PermissionResource.MenuItems, PermissionAction.Create);
         _store.MenuItems.Add(item);
+        _persistence.SaveMenuItem(item);
     }
 
     public void RemoveMenuItem(MenuItem item)
     {
         _auth.Require(PermissionResource.MenuItems, PermissionAction.Delete);
         _store.MenuItems.Remove(item);
+        _persistence.DeleteMenuItem(item);
     }
 
     public void UpdateMenuItem(MenuItem item, string name, decimal price, string category, bool isAvailable, string? imagePath = null)
@@ -93,12 +108,14 @@ public class RestaurantService
         item.Category = category;
         item.IsAvailable = isAvailable;
         if (imagePath != null) item.ImagePath = imagePath;
+        _persistence.SaveMenuItem(item);
     }
 
     public void ToggleAvailability(MenuItem item)
     {
         _auth.Require(PermissionResource.MenuItems, PermissionAction.Update);
         item.IsAvailable = !item.IsAvailable;
+        _persistence.SaveMenuItem(item);
     }
 
     public List<string> GetCategories() =>
@@ -108,13 +125,20 @@ public class RestaurantService
     {
         if (order.Status is not (OrderStatus.Placed or OrderStatus.Preparing)) return;
 
+        var added = false;
         foreach (var line in newLines)
         {
             if (line.Quantity < 1)
                 throw new ArgumentException(
                     "OrderLine.Quantity must be >= 1.", nameof(newLines));
             order.Lines.Add(line);
+            added = true;
         }
+
+        // Even if no lines were added we still recompute below in case the
+        // caller wants to trigger a fresh aggregation. Persist the order
+        // when we actually changed it.
+        if (added) _persistence.SaveOrder(order);
 
         RecomputeStayCharges(order.Stay);
     }
@@ -129,5 +153,6 @@ public class RestaurantService
         stay.RestaurantCharges = _store.Orders
             .Where(o => o.Stay == stay && o.Status != OrderStatus.Cancelled)
             .Sum(o => o.Total);
+        _persistence.SaveStay(stay);
     }
 }

@@ -1,5 +1,6 @@
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Persistence;
 
 namespace HotelManagement.WinForms.Services;
 
@@ -7,28 +8,47 @@ public class RoomService
 {
     private readonly DataStore _store;
     private readonly AuthService _auth;
+    private readonly IPersistenceContext _persistence;
 
-    public RoomService(DataStore store, AuthService auth)
+    public RoomService(DataStore store, AuthService auth, IPersistenceContext? persistence = null)
     {
         _store = store;
         _auth = auth;
+        _persistence = persistence ?? NullPersistenceContext.Instance;
     }
 
     public IEnumerable<Room> GetAvailableRooms() =>
         _store.Rooms.Where(r => r.IsAvailable);
 
-    public void MarkOccupied(Room room) => room.IsOccupied = true;
+    public void MarkOccupied(Room room)
+    {
+        room.IsOccupied = true;
+        _persistence.SaveRoom(room);
+    }
 
-    public void MarkVacant(Room room) => room.IsOccupied = false;
+    public void MarkVacant(Room room)
+    {
+        room.IsOccupied = false;
+        _persistence.SaveRoom(room);
+    }
 
-    public void MarkNeedsCleaning(Room room) => room.Condition = RoomCondition.NeedsCleaning;
+    public void MarkNeedsCleaning(Room room)
+    {
+        room.Condition = RoomCondition.NeedsCleaning;
+        _persistence.SaveRoom(room);
+    }
 
-    public void MarkClean(Room room) => room.Condition = RoomCondition.Clean;
+    public void MarkClean(Room room)
+    {
+        room.Condition = RoomCondition.Clean;
+        _persistence.SaveRoom(room);
+    }
 
     public void MarkOutOfService(Room room, string reason)
     {
         room.Condition = RoomCondition.OutOfService;
         room.MaintenanceLog = reason;
+        _persistence.SaveRoom(room);
     }
 
     public Room AddRoom(int number, int floor, RoomType type, decimal rate)
@@ -48,6 +68,7 @@ public class RoomService
 
         var room = new Room { Number = number, Floor = floor, Type = type, Rate = rate };
         _store.Rooms.Add(room);
+        _persistence.SaveRoom(room);
         return room;
     }
 
@@ -67,6 +88,7 @@ public class RoomService
         room.Floor = floor;
         room.Type = type;
         room.Rate = rate;
+        _persistence.SaveRoom(room);
     }
 
     public void RemoveRoom(Room room)
@@ -87,6 +109,7 @@ public class RoomService
                 $"Cannot remove Room {room.Number}: one or more active reservations reference it.");
 
         _store.Rooms.Remove(room);
+        _persistence.DeleteRoom(room);
     }
 
     public IEnumerable<RoomType> GetRoomTypes() => Enum.GetValues<RoomType>();

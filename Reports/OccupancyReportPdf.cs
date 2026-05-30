@@ -42,9 +42,11 @@ public sealed class OccupancyReportPdf : IDocument
         container.Page(page =>
         {
             page.Size(PageSizes.A4);
-            page.Margin(40);
+            page.Margin(28);
             page.PageColor(Colors.White);
-            page.DefaultTextStyle(t => t.FontFamily(Fonts.SegoeUI).FontSize(10));
+            // Use QuestPDF's bundled Lato (no explicit FontFamily) so the PDF
+            // renders identically regardless of host fonts.
+            page.DefaultTextStyle(t => t.FontSize(10));
 
             page.Header().Element(ComposeHeader);
             page.Content().Element(ComposeContent);

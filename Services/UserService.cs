@@ -1,5 +1,6 @@
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Persistence;
 using HotelManagement.WinForms.Services.Security;
 
 namespace HotelManagement.WinForms.Services;
@@ -8,11 +9,16 @@ public class UserService
 {
     private readonly DataStore _store;
     private readonly AuthService _auth;
+    private readonly IPersistenceContext _persistence;
 
-    public UserService(DataStore store, AuthService auth)
+    public UserService(
+        DataStore store,
+        AuthService auth,
+        IPersistenceContext? persistence = null)
     {
         _store = store;
         _auth = auth;
+        _persistence = persistence ?? NullPersistenceContext.Instance;
     }
 
     // --- Users ---
@@ -39,6 +45,7 @@ public class UserService
             Role = role
         };
         _store.Users.Add(user);
+        _persistence.SaveUser(user);
         return user;
     }
 
@@ -57,6 +64,7 @@ public class UserService
         if (!string.IsNullOrEmpty(newPassword))
             user.Password = PasswordHasher.Hash(newPassword);
         user.Role = role;
+        _persistence.SaveUser(user);
     }
 
     public void RemoveUser(User user)
@@ -76,6 +84,7 @@ public class UserService
         _auth.Require(PermissionResource.Users, PermissionAction.Delete);
 
         _store.Users.Remove(user);
+        _persistence.DeleteUser(user);
     }
 
     // --- Roles ---
@@ -93,6 +102,7 @@ public class UserService
 
         var role = new Role { Name = name.Trim(), Permissions = permissions.ToHashSet() };
         _store.Roles.Add(role);
+        _persistence.SaveRole(role);
         return role;
     }
 
@@ -109,6 +119,7 @@ public class UserService
 
         role.Name = name.Trim();
         role.Permissions = permissions.ToHashSet();
+        _persistence.SaveRole(role);
     }
 
     public void RemoveRole(Role role)
@@ -122,5 +133,6 @@ public class UserService
                 $"Role '{role.Name}' is assigned to one or more users. Reassign them first.");
 
         _store.Roles.Remove(role);
+        _persistence.DeleteRole(role);
     }
 }

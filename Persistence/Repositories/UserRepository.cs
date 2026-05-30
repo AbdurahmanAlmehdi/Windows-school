@@ -20,6 +20,17 @@ public sealed class UserRepository
         INSERT INTO dbo.users (user_id, username, password_hash, role_id)
         VALUES (@id, @username, @password, @role);";
 
+    private const string UpsertSql = @"
+        IF EXISTS (SELECT 1 FROM dbo.users WHERE user_id = @id)
+            UPDATE dbo.users
+               SET username = @username, password_hash = @password, role_id = @role
+             WHERE user_id = @id;
+        ELSE
+            INSERT INTO dbo.users (user_id, username, password_hash, role_id)
+            VALUES (@id, @username, @password, @role);";
+
+    private const string DeleteSql = @"DELETE FROM dbo.users WHERE user_id = @id;";
+
     public List<User> GetAll(IReadOnlyDictionary<Guid, Role> rolesById)
     {
         using var c = _db.Open();
@@ -56,14 +67,25 @@ public sealed class UserRepository
         cmd.ExecuteNonQuery();
     }
 
-    public void Insert(User user, SqlConnection c, SqlTransaction tx)
+    public void Insert(User user, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(InsertSql, user, c, tx);
+
+    public void Upsert(User user, SqlConnection c, SqlTransaction tx) =>
+        ExecuteWrite(UpsertSql, user, c, tx);
+
+    public void Delete(User user, SqlConnection c, SqlTransaction tx)
     {
-        using var cmd = new SqlCommand(InsertSql, c, tx);
+        using var cmd = new SqlCommand(DeleteSql, c, tx);
+        cmd.Parameters.AddWithValue("@id", user.Id);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void ExecuteWrite(string sql, User user, SqlConnection c, SqlTransaction tx)
+    {
+        using var cmd = new SqlCommand(sql, c, tx);
         cmd.Parameters.AddWithValue("@id",       user.Id);
         cmd.Parameters.AddWithValue("@username", user.Username);
-        // Password field is intentionally written as-is. Production deployments
-        // must replace this with a hashed value per NFR-SEC-1; the schema column
-        // is named password_hash for that future migration.
+        // user.Password contains a BCrypt hash (NFR-SEC-1); see PasswordHasher.
         cmd.Parameters.AddWithValue("@password", user.Password);
         cmd.Parameters.AddWithValue("@role",     user.Role.Id);
         cmd.ExecuteNonQuery();
