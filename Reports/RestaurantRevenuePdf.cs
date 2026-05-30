@@ -10,7 +10,6 @@ namespace HotelManagement.WinForms.Reports;
 public sealed class RestaurantRevenuePdf : IDocument
 {
     private static readonly string PrimaryNavy = Colors.Blue.Darken4;
-    private static readonly string AccentGold  = "#D4AF37";
 
     private readonly ReportService _reports;
     private readonly InvoiceService _invoices;
@@ -55,19 +54,18 @@ public sealed class RestaurantRevenuePdf : IDocument
 
     private void ComposeHeader(IContainer container)
     {
-        container.Row(row =>
+        // Single-line right-aligned date stamp - the stacked column layout
+        // was being visually clipped on Windows.
+        container.PaddingBottom(8).Row(row =>
         {
             row.RelativeItem().Column(c =>
             {
                 c.Item().Text("Restaurant Revenue").FontSize(20).SemiBold().FontColor(PrimaryNavy);
                 c.Item().Text("Hotel Management System").FontSize(10).FontColor(Colors.Grey.Darken1);
             });
-            row.ConstantItem(180).AlignRight().Column(c =>
-            {
-                c.Item().AlignRight().Text("Generated").FontSize(9).FontColor(Colors.Grey.Darken1);
-                c.Item().AlignRight().Text(_generatedAt.ToString("MMM dd, yyyy"))
-                    .FontSize(12).SemiBold().FontColor(AccentGold);
-            });
+            row.RelativeItem().AlignRight().AlignBottom().Text(
+                $"Report generated {_generatedAt:MMM dd, yyyy} at {_generatedAt:HH:mm}")
+                .FontSize(10).FontColor(Colors.Grey.Darken2);
         });
     }
 
@@ -109,7 +107,7 @@ public sealed class RestaurantRevenuePdf : IDocument
                     t.Header(h =>
                     {
                         h.Cell().Element(HeaderCell).Text("Category");
-                        h.Cell().Element(HeaderCell).AlignRight().Text("Revenue");
+                        h.Cell().Element(HeaderCell).AlignCenter().Text("Revenue");
                     });
                     foreach (var (cat, amount) in byCategory.OrderByDescending(kv => kv.Value))
                     {
@@ -140,7 +138,7 @@ public sealed class RestaurantRevenuePdf : IDocument
                     {
                         h.Cell().Element(HeaderCell).AlignCenter().Text("#");
                         h.Cell().Element(HeaderCell).Text("Item");
-                        h.Cell().Element(HeaderCell).AlignRight().Text("Units sold");
+                        h.Cell().Element(HeaderCell).AlignCenter().Text("Units Sold");
                     });
                     int rank = 1;
                     foreach (var item in topItems)

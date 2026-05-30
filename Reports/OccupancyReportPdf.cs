@@ -12,7 +12,6 @@ namespace HotelManagement.WinForms.Reports;
 public sealed class OccupancyReportPdf : IDocument
 {
     private static readonly string PrimaryNavy = Colors.Blue.Darken4;
-    private static readonly string AccentGold  = "#D4AF37";
 
     private readonly DataStore _store;
     private readonly ReportService _reports;
@@ -57,21 +56,19 @@ public sealed class OccupancyReportPdf : IDocument
 
     private void ComposeHeader(IContainer container)
     {
-        container.Row(row =>
+        // Single-line date stamp on the right avoids the stacked-column
+        // layout that was getting visually clipped on some Windows DPI
+        // settings (the "Generate..." truncation reported during testing).
+        container.PaddingBottom(8).Row(row =>
         {
             row.RelativeItem().Column(c =>
             {
                 c.Item().Text("Occupancy Report").FontSize(20).SemiBold().FontColor(PrimaryNavy);
                 c.Item().Text("Hotel Management System").FontSize(10).FontColor(Colors.Grey.Darken1);
             });
-            row.ConstantItem(180).AlignRight().Column(c =>
-            {
-                c.Item().AlignRight().Text("Generated").FontSize(9).FontColor(Colors.Grey.Darken1);
-                c.Item().AlignRight().Text(_generatedAt.ToString("MMM dd, yyyy"))
-                    .FontSize(12).SemiBold().FontColor(AccentGold);
-                c.Item().AlignRight().Text(_generatedAt.ToString("HH:mm"))
-                    .FontSize(9).FontColor(Colors.Grey.Darken1);
-            });
+            row.RelativeItem().AlignRight().AlignBottom().Text(
+                $"Report generated {_generatedAt:MMM dd, yyyy} at {_generatedAt:HH:mm}")
+                .FontSize(10).FontColor(Colors.Grey.Darken2);
         });
     }
 
@@ -137,10 +134,13 @@ public sealed class OccupancyReportPdf : IDocument
 
                 t.Header(h =>
                 {
+                    // All headers use AlignCenter so none get pushed to the
+                    // cell's edge and visually clipped. Body cells keep
+                    // AlignRight for the numeric values where it reads better.
                     h.Cell().Element(HeaderCell).Text("Type");
                     h.Cell().Element(HeaderCell).AlignCenter().Text("Total");
                     h.Cell().Element(HeaderCell).AlignCenter().Text("Occupied");
-                    h.Cell().Element(HeaderCell).AlignRight().Text("Avg rate");
+                    h.Cell().Element(HeaderCell).AlignCenter().Text("Avg Rate");
                 });
 
                 foreach (var type in Enum.GetValues<RoomType>())
@@ -176,10 +176,10 @@ public sealed class OccupancyReportPdf : IDocument
                     });
                     t.Header(h =>
                     {
-                        h.Cell().Element(HeaderCell).Text("Room");
+                        h.Cell().Element(HeaderCell).AlignCenter().Text("Room");
                         h.Cell().Element(HeaderCell).Text("Guest");
-                        h.Cell().Element(HeaderCell).Text("Check-in");
-                        h.Cell().Element(HeaderCell).Text("Expected out");
+                        h.Cell().Element(HeaderCell).AlignCenter().Text("Check-in");
+                        h.Cell().Element(HeaderCell).AlignCenter().Text("Expected Out");
                     });
                     foreach (var stay in active.OrderBy(s => s.Room.Number))
                     {

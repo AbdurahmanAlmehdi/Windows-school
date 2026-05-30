@@ -60,7 +60,9 @@ public sealed class InvoicePdf : IDocument
 
     private void ComposeHeader(IContainer container)
     {
-        container.Row(row =>
+        // Right-side block uses RelativeItem (not ConstantItem) so the text
+        // fits flush to the page margin without clipping on Windows.
+        container.PaddingBottom(8).Row(row =>
         {
             row.RelativeItem().Column(col =>
             {
@@ -68,7 +70,7 @@ public sealed class InvoicePdf : IDocument
                 col.Item().Text(HotelTagline).FontSize(10).FontColor(Colors.Grey.Darken1);
             });
 
-            row.ConstantItem(180).AlignRight().Column(col =>
+            row.RelativeItem().AlignRight().Column(col =>
             {
                 col.Item().AlignRight().Text(_invoice.InvoiceNumber)
                     .FontSize(18).SemiBold().FontColor(AccentGold);
@@ -157,10 +159,12 @@ public sealed class InvoicePdf : IDocument
 
                     table.Header(h =>
                     {
+                        // Headers use AlignCenter so they don't get clipped at
+                        // the cell's right edge near the page margin.
                         h.Cell().Element(HeaderCell).Text("Description");
                         h.Cell().Element(HeaderCell).AlignCenter().Text("Qty");
-                        h.Cell().Element(HeaderCell).AlignRight().Text("Unit");
-                        h.Cell().Element(HeaderCell).AlignRight().Text("Amount");
+                        h.Cell().Element(HeaderCell).AlignCenter().Text("Unit");
+                        h.Cell().Element(HeaderCell).AlignCenter().Text("Amount");
                     });
 
                     foreach (var line in lines)
