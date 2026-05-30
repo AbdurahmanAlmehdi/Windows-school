@@ -38,13 +38,13 @@ public sealed class InvoicePdf : IDocument
     {
         container.Page(page =>
         {
-            page.Size(PageSizes.A4);
+            // Landscape A4 - the line-items table + totals stack are wider
+            // than portrait can hold without clipping the right-hand column.
+            page.Size(PageSizes.A4.Landscape());
             page.Margin(28);
             page.PageColor(Colors.White);
-            // Intentionally NOT setting FontFamily - QuestPDF embeds Lato by
-            // default, which renders identically across Windows/Mac/Linux.
-            // Setting Segoe UI here previously caused right-side clipping on
-            // systems that fell back to a wider substitute font.
+            // Use QuestPDF's bundled Lato (no explicit FontFamily) so the PDF
+            // renders identically regardless of host fonts.
             page.DefaultTextStyle(t => t.FontSize(10));
 
             page.Header().Element(ComposeHeader);

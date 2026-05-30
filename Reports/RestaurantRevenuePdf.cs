@@ -39,11 +39,11 @@ public sealed class RestaurantRevenuePdf : IDocument
     {
         container.Page(page =>
         {
-            page.Size(PageSizes.A4);
+            // Landscape A4 - three KPI cards across + revenue tables read
+            // better wide; portrait was clipping the right-hand column.
+            page.Size(PageSizes.A4.Landscape());
             page.Margin(28);
             page.PageColor(Colors.White);
-            // Use QuestPDF's bundled Lato (no explicit FontFamily) so the PDF
-            // renders identically regardless of host fonts.
             page.DefaultTextStyle(t => t.FontSize(10));
 
             page.Header().Element(ComposeHeader);

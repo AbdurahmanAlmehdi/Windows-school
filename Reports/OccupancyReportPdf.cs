@@ -41,11 +41,11 @@ public sealed class OccupancyReportPdf : IDocument
     {
         container.Page(page =>
         {
-            page.Size(PageSizes.A4);
+            // Landscape A4 - the rooms-by-type table reads better wide and
+            // portrait was clipping the rightmost column header ("Avg rate").
+            page.Size(PageSizes.A4.Landscape());
             page.Margin(28);
             page.PageColor(Colors.White);
-            // Use QuestPDF's bundled Lato (no explicit FontFamily) so the PDF
-            // renders identically regardless of host fonts.
             page.DefaultTextStyle(t => t.FontSize(10));
 
             page.Header().Element(ComposeHeader);

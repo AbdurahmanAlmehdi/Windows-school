@@ -1878,38 +1878,70 @@ partial class MainForm
 
         tabReports.Controls.Add(pnlRepHeader);
 
-        // Scrollable content area
-        var flpReports = new FlowLayoutPanel
+        // ----- KPI row -----
+        // 4 equal columns at 25% each. Cards dock-fill their cells so they
+        // stretch with the window instead of bunching in the top-left.
+        var pnlKpiRow = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 140,
+            ColumnCount = 4,
+            RowCount = 1,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(0, 8, 0, 8)
+        };
+        pnlKpiRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        pnlKpiRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        pnlKpiRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        pnlKpiRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 25f));
+        pnlKpiRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+        pnlOccReport = CreateMetricCard("Occupancy Rate", AppColors.Primary, out lblOccReportValue, out _, new Size(0, 0));
+        pnlOccReport.Dock = DockStyle.Fill;
+        pnlOccReport.Margin = new Padding(6);
+
+        pnlAvgStay = CreateMetricCard("Avg Stay Duration", AppColors.Tertiary, out lblAvgStayValue, out _, new Size(0, 0));
+        pnlAvgStay.Dock = DockStyle.Fill;
+        pnlAvgStay.Margin = new Padding(6);
+
+        pnlRepeatGuest = CreateMetricCard("Repeat Guests", AppColors.StatusClean, out lblRepeatGuestValue, out _, new Size(0, 0));
+        pnlRepeatGuest.Dock = DockStyle.Fill;
+        pnlRepeatGuest.Margin = new Padding(6);
+
+        pnlTotalRevenue = CreateMetricCard("Total Revenue", AppColors.Accent, out lblTotalRevenueValue, out _, new Size(0, 0));
+        lblTotalRevenueValue.ForeColor = AppColors.Primary;
+        pnlTotalRevenue.Dock = DockStyle.Fill;
+        pnlTotalRevenue.Margin = new Padding(6);
+
+        pnlKpiRow.Controls.Add(pnlOccReport,    0, 0);
+        pnlKpiRow.Controls.Add(pnlAvgStay,      1, 0);
+        pnlKpiRow.Controls.Add(pnlRepeatGuest,  2, 0);
+        pnlKpiRow.Controls.Add(pnlTotalRevenue, 3, 0);
+
+        tabReports.Controls.Add(pnlKpiRow);
+
+        // ----- Analytics row -----
+        // 3 equal columns, each holding a GroupBox that stretches to fill.
+        var pnlAnalyticsRow = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            AutoScroll = true,
-            WrapContents = true,
-            Padding = new Padding(0, 5, 0, 0),
-            BackColor = AppColors.Surface
+            ColumnCount = 3,
+            RowCount = 1,
+            BackColor = AppColors.Surface,
+            Padding = new Padding(0, 8, 0, 8)
         };
+        pnlAnalyticsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
+        pnlAnalyticsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
+        pnlAnalyticsRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.34f));
+        pnlAnalyticsRow.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
 
-        // KPI panels
-        pnlOccReport = CreateMetricCard("Occupancy Rate", AppColors.Primary, out lblOccReportValue, out _, new Size(200, 90));
-        pnlOccReport.Margin = new Padding(0, 0, 10, 10);
-
-        pnlAvgStay = CreateMetricCard("Avg Stay Duration", AppColors.Tertiary, out lblAvgStayValue, out _, new Size(200, 90));
-        pnlAvgStay.Margin = new Padding(0, 0, 10, 10);
-
-        pnlRepeatGuest = CreateMetricCard("Repeat Guests", AppColors.StatusClean, out lblRepeatGuestValue, out _, new Size(200, 90));
-        pnlRepeatGuest.Margin = new Padding(0, 0, 10, 10);
-
-        pnlTotalRevenue = CreateMetricCard("Total Revenue", AppColors.Accent, out lblTotalRevenueValue, out _, new Size(200, 90));
-        lblTotalRevenueValue.ForeColor = AppColors.Primary;
-        pnlTotalRevenue.Margin = new Padding(0, 0, 10, 10);
-
-        // GroupBoxes
         grpRevRoom = new GroupBox
         {
             Text = "Revenue by Room Type",
             Font = new Font("Segoe UI", 11, FontStyle.Bold),
             ForeColor = AppColors.Primary,
-            Size = new Size(280, 200),
-            Margin = new Padding(0, 0, 10, 10)
+            Dock = DockStyle.Fill,
+            Margin = new Padding(6)
         };
         lblRevRoom = new Label { Font = new Font("Segoe UI", 10), ForeColor = AppColors.Gray700, Location = new Point(12, 28), AutoSize = true };
         grpRevRoom.Controls.Add(lblRevRoom);
@@ -1919,8 +1951,8 @@ partial class MainForm
             Text = "Restaurant Revenue by Category",
             Font = new Font("Segoe UI", 11, FontStyle.Bold),
             ForeColor = AppColors.Primary,
-            Size = new Size(280, 200),
-            Margin = new Padding(0, 0, 10, 10)
+            Dock = DockStyle.Fill,
+            Margin = new Padding(6)
         };
         lblRevRestaurant = new Label { Font = new Font("Segoe UI", 10), ForeColor = AppColors.Gray700, Location = new Point(12, 28), AutoSize = true };
         grpRevRestaurant.Controls.Add(lblRevRestaurant);
@@ -1930,18 +1962,17 @@ partial class MainForm
             Text = "Top Menu Items",
             Font = new Font("Segoe UI", 11, FontStyle.Bold),
             ForeColor = AppColors.Primary,
-            Size = new Size(280, 200),
-            Margin = new Padding(0, 0, 10, 10)
+            Dock = DockStyle.Fill,
+            Margin = new Padding(6)
         };
         lblTopItems = new Label { Font = new Font("Segoe UI", 10), ForeColor = AppColors.Gray700, Location = new Point(12, 28), AutoSize = true };
         grpTopItems.Controls.Add(lblTopItems);
 
-        flpReports.Controls.AddRange(new Control[] {
-            pnlOccReport, pnlAvgStay, pnlRepeatGuest, pnlTotalRevenue,
-            grpRevRoom, grpRevRestaurant, grpTopItems
-        });
+        pnlAnalyticsRow.Controls.Add(grpRevRoom,       0, 0);
+        pnlAnalyticsRow.Controls.Add(grpRevRestaurant, 1, 0);
+        pnlAnalyticsRow.Controls.Add(grpTopItems,      2, 0);
 
-        tabReports.Controls.Add(flpReports);
+        tabReports.Controls.Add(pnlAnalyticsRow);
     }
 
     private void InitUsersTab()
