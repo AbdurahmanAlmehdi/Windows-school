@@ -244,6 +244,9 @@ public class CheckoutForm : Form
             btnCancel.FlatAppearance.BorderSize = 0;
             content.Controls.Add(btnCancel);
 
+            var btnSavePdf = BuildSavePdfButton(370, y);
+            content.Controls.Add(btnSavePdf);
+
             AcceptButton = btnConfirm;
             CancelButton = btnCancel;
         }
@@ -282,6 +285,9 @@ public class CheckoutForm : Form
             };
             btnClose.FlatAppearance.BorderSize = 0;
             content.Controls.Add(btnClose);
+
+            var btnSavePdf = BuildSavePdfButton(110, y);
+            content.Controls.Add(btnSavePdf);
 
             CancelButton = btnClose;
         }
@@ -363,6 +369,61 @@ public class CheckoutForm : Form
         y += 10;
 
         return y;
+    }
+
+    private Button BuildSavePdfButton(int x, int y)
+    {
+        var btn = new Button
+        {
+            Text = "Save as PDF",
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(150, _isReadOnly ? 40 : 44),
+            Location = new Point(x, y),
+            Cursor = Cursors.Hand
+        };
+        btn.FlatAppearance.BorderSize = 0;
+        btn.Click += (s, e) => SavePdf();
+        return btn;
+    }
+
+    private void SavePdf()
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "Save invoice as PDF",
+            Filter = "PDF document (*.pdf)|*.pdf",
+            FileName = $"{_invoice.InvoiceNumber}.pdf",
+            DefaultExt = "pdf",
+            AddExtension = true,
+            OverwritePrompt = true,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            Cursor = Cursors.WaitCursor;
+            Reports.InvoicePdf.Save(_invoice, dlg.FileName);
+            MessageBox.Show(this,
+                $"Saved to:\n{dlg.FileName}",
+                "Invoice exported",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Could not generate PDF.\n\n{ex.Message}",
+                "Export failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            Cursor = Cursors.Default;
+        }
     }
 
     private int AddTotalRow(Panel parent, string label, decimal amount, int y, bool bold)

@@ -79,7 +79,7 @@ public class BookingServiceTests
         var act = () => h.Booking.CreateReservation(
             primary, room, DateTime.Today.AddDays(2), DateTime.Today.AddDays(4),
             accompanying: party,
-            marriageCertificatePath: null);
+            marriageCertificateId: null);
 
         act.Should().Throw<InvalidOperationException>().WithMessage("*marriage*");
     }
@@ -88,7 +88,7 @@ public class BookingServiceTests
     public void CreateReservation_AllowsSameGenderAdults_WithoutCertificate()
     {
         var h = TestStoreFactory.Build();
-        var room = h.Store.Rooms.First(r => r.IsAvailable && r.Capacity >= 2);
+        var room = TestStoreFactory.FirstAvailableRoom(h.Store, minCapacity: 2);
         var primary = new Guest { Name = "Pat", Gender = Gender.Male, Passport = "X1" };
         var party = new List<AccompanyingGuest>
         {
@@ -106,7 +106,7 @@ public class BookingServiceTests
     public void CreateReservation_AllowsOppositeGenderChild_WithoutCertificate_PerFR_RES_10()
     {
         var h = TestStoreFactory.Build();
-        var room = h.Store.Rooms.First(r => r.IsAvailable && r.Capacity >= 2);
+        var room = TestStoreFactory.FirstAvailableRoom(h.Store, minCapacity: 2);
         var primary = new Guest { Name = "Adult", Gender = Gender.Male, Passport = "X1" };
         var party = new List<AccompanyingGuest>
         {

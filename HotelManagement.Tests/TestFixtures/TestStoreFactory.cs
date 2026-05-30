@@ -47,10 +47,24 @@ internal static class TestStoreFactory
     }
 
     public static Room FirstAvailableRoom(DataStore store) =>
-        store.Rooms.First(r => r.IsAvailable);
+        store.Rooms.First(r => r.IsAvailable && !HasActiveReservation(store, r));
+
+    public static Room FirstAvailableRoom(DataStore store, int minCapacity) =>
+        store.Rooms.First(r => r.IsAvailable
+                            && r.Capacity >= minCapacity
+                            && !HasActiveReservation(store, r));
 
     public static Stay FirstActiveStay(DataStore store) =>
         store.Stays.First(s => s.Status == StayStatus.Active);
 
+    public static Stay FirstActiveStayWithoutOrders(DataStore store) =>
+        store.Stays.First(s => s.Status == StayStatus.Active && store.Orders.All(o => o.Stay != s));
+
     public static Guest FirstGuest(DataStore store) => store.Guests[0];
+
+    private static bool HasActiveReservation(DataStore store, Room room) =>
+        store.Reservations.Any(r =>
+            r.Room == room &&
+            r.Status != ReservationStatus.Cancelled &&
+            r.Status != ReservationStatus.Completed);
 }

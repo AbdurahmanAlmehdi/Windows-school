@@ -14,8 +14,10 @@ public class AuthService
 
     public User? CurrentUser { get; private set; }
 
-    public bool Login(string username, string password)
+    public bool Login(string? username, string? password)
     {
+        if (username == null || password == null) return false;
+
         var user = _store.Users.FirstOrDefault(u =>
             u.Username.Equals(username, StringComparison.OrdinalIgnoreCase) &&
             u.Password == password);

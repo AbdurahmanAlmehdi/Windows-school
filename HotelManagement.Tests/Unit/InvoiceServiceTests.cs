@@ -36,8 +36,10 @@ public class InvoiceServiceTests
     [Fact]
     public void GenerateInvoice_ExcludesCancelledOrderLines_PerFR_INV_1()
     {
+        // Use an Active stay with no seed orders so the test asserts on only
+        // the orders it creates itself.
         var h = TestStoreFactory.Build();
-        var stay = TestStoreFactory.FirstActiveStay(h.Store);
+        var stay = TestStoreFactory.FirstActiveStayWithoutOrders(h.Store);
         var item = h.Store.MenuItems[0];
         var live = h.Restaurant.CreateOrder(stay, new[] { new OrderLine { MenuItem = item, Quantity = 1 } });
         var cancelled = h.Restaurant.CreateOrder(stay, new[] { new OrderLine { MenuItem = item, Quantity = 9 } });

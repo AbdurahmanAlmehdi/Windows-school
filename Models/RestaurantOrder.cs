@@ -4,6 +4,7 @@ namespace HotelManagement.WinForms.Models;
 
 public class RestaurantOrder
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public Stay Stay { get; set; } = null!;
     public OrderStatus Status { get; set; }
     public BindingList<OrderLine> Lines { get; set; } = new();

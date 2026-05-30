@@ -55,12 +55,19 @@ public class UserService
 
     public void RemoveUser(User user)
     {
-        _auth.Require(PermissionResource.Users, PermissionAction.Delete);
-
+        // Self-removal guard fires before any other check so a signed-in user
+        // sees the specific "signed-in" message even when they are also the
+        // last system admin.
         if (user == _auth.CurrentUser)
             throw new InvalidOperationException("You cannot remove the currently signed-in user.");
+
+        // FR-USR-7 / DEF-17: the data-integrity invariant ("at least one system
+        // admin must remain") fires BEFORE the permission check, so a caller
+        // who bypasses authorization can still not orphan the system.
         if (user.Role?.IsSystem == true && _store.Users.Count(u => u.Role?.IsSystem == true) <= 1)
             throw new InvalidOperationException("Cannot remove the last system administrator.");
+
+        _auth.Require(PermissionResource.Users, PermissionAction.Delete);
 
         _store.Users.Remove(user);
     }

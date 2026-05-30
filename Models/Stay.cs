@@ -2,6 +2,7 @@ namespace HotelManagement.WinForms.Models;
 
 public class Stay
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public Guest Guest { get; set; } = null!;
     public Room Room { get; set; } = null!;
     public DateTime CheckInDate { get; set; }

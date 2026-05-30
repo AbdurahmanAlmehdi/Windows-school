@@ -11,16 +11,16 @@ public class ReservationDialog : Form
     private readonly DataStore _store;
     private readonly RoomService _roomService;
     private readonly BookingService _bookingService;
+    private readonly Room? _preselectedRoom;
 
     private Guest? _lookedUpGuest;
-    private string? _pickedCertPath;
 
-    private TextBox _txtPhone = null!;
+    private TextBox _txtPassport = null!;
     private Button _btnLookup = null!;
     private Label _lblGuestStatus = null!;
     private TextBox _txtGuestName = null!;
     private ComboBox _cmbGuestGender = null!;
-    private TextBox _txtPassport = null!;
+    private TextBox _txtPhone = null!;
 
     private ComboBox _cmbRoomNumber = null!;
     private TextBox _txtRoomType = null!;
@@ -37,17 +37,22 @@ public class ReservationDialog : Form
     private Label _lblCapacityStatus = null!;
 
     private Panel _pnlCertificate = null!;
-    private Label _lblCertFile = null!;
-    private Button _btnPickCert = null!;
+    private TextBox _txtCertificateId = null!;
 
     private Button _btnSave = null!;
     private Button _btnCancel = null!;
 
-    public ReservationDialog(DataStore store, RoomService roomService, BookingService bookingService)
+    public ReservationDialog(
+        DataStore store,
+        RoomService roomService,
+        BookingService bookingService,
+        Room? preselectedRoom = null)
     {
         _store = store;
         _roomService = roomService;
         _bookingService = bookingService;
+        _preselectedRoom = preselectedRoom;
+
         BuildLayout();
         PopulateRooms();
         UpdateCertificateSection();
@@ -56,7 +61,9 @@ public class ReservationDialog : Form
 
     private void BuildLayout()
     {
-        Text = "New Reservation";
+        Text = _preselectedRoom != null
+            ? $"Reserve Room {_preselectedRoom.Number}"
+            : "New Reservation";
         Size = new Size(780, 880);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -72,7 +79,9 @@ public class ReservationDialog : Form
         };
         header.Controls.Add(new Label
         {
-            Text = "NEW RESERVATION",
+            Text = _preselectedRoom != null
+                ? $"RESERVE ROOM {_preselectedRoom.Number}"
+                : "NEW RESERVATION",
             Font = new Font("Segoe UI", 16, FontStyle.Bold),
             ForeColor = AppColors.Accent,
             AutoSize = true,
@@ -94,16 +103,17 @@ public class ReservationDialog : Form
         // --- Guest ---
         body.Controls.Add(SectionHeader("GUEST", 0, y)); y += 28;
 
-        body.Controls.Add(FieldLabel("Phone", 0, y));
-        _txtPhone = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(0, y + 20), Size = new Size(170, 28) };
+        // Passport is the primary identifier (mid-term UI feedback).
+        body.Controls.Add(FieldLabel("Passport #", 0, y));
+        _txtPassport = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(0, y + 20), Size = new Size(170, 28) };
         _btnLookup = PrimaryButton("Lookup", 180, y + 20, 80);
         _btnLookup.Click += BtnLookup_Click;
-        body.Controls.Add(_txtPhone);
+        body.Controls.Add(_txtPassport);
         body.Controls.Add(_btnLookup);
 
         _lblGuestStatus = new Label
         {
-            Text = "",
+            Text = "Enter a passport number to look up an existing guest.",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Gray500,
             AutoSize = true,
@@ -130,9 +140,9 @@ public class ReservationDialog : Form
         body.Controls.Add(_cmbGuestGender);
         y += 56;
 
-        body.Controls.Add(FieldLabel("Passport #", 0, y));
-        _txtPassport = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(0, y + 20), Size = new Size(colW, 28) };
-        body.Controls.Add(_txtPassport);
+        body.Controls.Add(FieldLabel("Phone (optional)", 0, y));
+        _txtPhone = new TextBox { Font = new Font("Segoe UI", 10), Location = new Point(0, y + 20), Size = new Size(colW, 28) };
+        body.Controls.Add(_txtPhone);
         y += 56;
 
         // --- Room ---
@@ -144,7 +154,8 @@ public class ReservationDialog : Form
             Font = new Font("Segoe UI", 10),
             DropDownStyle = ComboBoxStyle.DropDownList,
             Location = new Point(0, y + 20),
-            Size = new Size(colW, 28)
+            Size = new Size(colW, 28),
+            Enabled = _preselectedRoom == null
         };
         _cmbRoomNumber.SelectedIndexChanged += (s, e) => { UpdateRoomDetails(); UpdateCapacityStatus(); };
         body.Controls.Add(_cmbRoomNumber);
@@ -299,7 +310,7 @@ public class ReservationDialog : Form
         body.Controls.Add(_lblCapacityStatus);
         y += 44;
 
-        // --- Marriage Certificate (conditional) ---
+
         _pnlCertificate = new Panel
         {
             Location = new Point(0, y),
@@ -317,28 +328,22 @@ public class ReservationDialog : Form
             AutoSize = true,
             Location = new Point(12, 8)
         };
-        _btnPickCert = new Button
+        var lblCertHint = new Label
         {
-            Text = "Choose Image…",
-            Font = new Font("Segoe UI", 9, FontStyle.Bold),
-            BackColor = AppColors.Primary,
-            ForeColor = Color.White,
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(130, 28),
-            Location = new Point(12, 36),
-            Cursor = Cursors.Hand
-        };
-        _btnPickCert.FlatAppearance.BorderSize = 0;
-        _btnPickCert.Click += BtnPickCert_Click;
-        _lblCertFile = new Label
-        {
-            Text = "No file selected",
+            Text = "Certificate ID:",
             Font = new Font("Segoe UI", 9),
             ForeColor = AppColors.Gray600,
             AutoSize = true,
-            Location = new Point(150, 41)
+            Location = new Point(12, 40)
         };
-        _pnlCertificate.Controls.AddRange(new Control[] { lblCertTitle, _btnPickCert, _lblCertFile });
+        _txtCertificateId = new TextBox
+        {
+            Font = new Font("Segoe UI", 10),
+            Location = new Point(110, 36),
+            Size = new Size(280, 28),
+            PlaceholderText = "e.g. MC-2024-00123"
+        };
+        _pnlCertificate.Controls.AddRange(new Control[] { lblCertTitle, lblCertHint, _txtCertificateId });
         body.Controls.Add(_pnlCertificate);
         y += 100;
 
@@ -439,6 +444,15 @@ public class ReservationDialog : Form
     private void PopulateRooms()
     {
         _cmbRoomNumber.Items.Clear();
+
+        if (_preselectedRoom != null)
+        {
+            _cmbRoomNumber.Items.Add(_preselectedRoom);
+            _cmbRoomNumber.DisplayMember = nameof(Room.Number);
+            _cmbRoomNumber.SelectedIndex = 0;
+            return;
+        }
+
         foreach (var room in _roomService.GetAvailableRooms())
             _cmbRoomNumber.Items.Add(room);
         _cmbRoomNumber.DisplayMember = nameof(Room.Number);
@@ -492,23 +506,23 @@ public class ReservationDialog : Form
 
     private void BtnLookup_Click(object? sender, EventArgs e)
     {
-        var phone = _txtPhone.Text.Trim();
-        if (string.IsNullOrEmpty(phone))
+        var passport = _txtPassport.Text.Trim();
+        if (string.IsNullOrEmpty(passport))
         {
-            _lblGuestStatus.Text = "Enter a phone number.";
+            _lblGuestStatus.Text = "Enter a passport number.";
             _lblGuestStatus.ForeColor = AppColors.Gray500;
             return;
         }
 
         _lookedUpGuest = _store.Guests.FirstOrDefault(g =>
-            g.Contact.Equals(phone, StringComparison.OrdinalIgnoreCase));
+            g.Passport.Equals(passport, StringComparison.OrdinalIgnoreCase));
 
         if (_lookedUpGuest != null)
         {
             _lblGuestStatus.Text = $"Found returning guest: {_lookedUpGuest.Name}";
             _lblGuestStatus.ForeColor = AppColors.Tertiary;
             _txtGuestName.Text = _lookedUpGuest.Name;
-            _txtPassport.Text = _lookedUpGuest.Passport;
+            _txtPhone.Text = _lookedUpGuest.Contact;
             _cmbGuestGender.SelectedItem = _lookedUpGuest.Gender;
         }
         else
@@ -533,21 +547,6 @@ public class ReservationDialog : Form
         _pnlCertificate.Visible = RequiresMarriageCertificate();
     }
 
-    private void BtnPickCert_Click(object? sender, EventArgs e)
-    {
-        using var dlg = new OpenFileDialog
-        {
-            Title = "Select marriage certificate image",
-            Filter = "Image files|*.jpg;*.jpeg;*.png;*.bmp;*.gif|All files|*.*"
-        };
-        if (dlg.ShowDialog(this) == DialogResult.OK)
-        {
-            _pickedCertPath = dlg.FileName;
-            _lblCertFile.Text = Path.GetFileName(_pickedCertPath);
-            _lblCertFile.ForeColor = AppColors.Tertiary;
-        }
-    }
-
     private void BtnSave_Click(object? sender, EventArgs e)
     {
         // Commit any pending grid edit
@@ -557,9 +556,8 @@ public class ReservationDialog : Form
         var phone = _txtPhone.Text.Trim();
         var passport = _txtPassport.Text.Trim();
 
-        if (string.IsNullOrEmpty(phone)) { Warn("Phone is required."); return; }
-        if (string.IsNullOrEmpty(name)) { Warn("Guest name is required."); return; }
         if (string.IsNullOrEmpty(passport)) { Warn("Passport number is required."); return; }
+        if (string.IsNullOrEmpty(name)) { Warn("Guest name is required."); return; }
 
         if (_cmbRoomNumber.SelectedItem is not Room room)
         {
@@ -596,17 +594,23 @@ public class ReservationDialog : Form
 
         var guestGender = (Gender)(_cmbGuestGender.SelectedItem ?? Gender.Male);
 
-        string? certStoredPath = null;
+        string? certificateId = null;
         if (RequiresMarriageCertificate())
         {
-            if (string.IsNullOrEmpty(_pickedCertPath) || !File.Exists(_pickedCertPath))
+            certificateId = _txtCertificateId.Text.Trim();
+            if (string.IsNullOrEmpty(certificateId))
             {
-                Warn("A marriage certificate image is required for a mixed-gender couple."); return;
+                Warn("A marriage certificate ID is required for a mixed-gender couple."); return;
             }
-            certStoredPath = CopyCertificate(_pickedCertPath);
         }
 
         var guest = _lookedUpGuest;
+        if (guest == null)
+        {
+            guest = _store.Guests.FirstOrDefault(g =>
+                g.Passport.Equals(passport, StringComparison.OrdinalIgnoreCase));
+        }
+
         if (guest == null)
         {
             guest = new Guest
@@ -621,28 +625,24 @@ public class ReservationDialog : Form
         else
         {
             guest.Name = name;
+            guest.Contact = phone;
             guest.Passport = passport;
             guest.Gender = guestGender;
         }
 
-        _bookingService.CreateReservation(
-            guest, room,
-            _dtpCheckIn.Value.Date, _dtpCheckOut.Value.Date,
-            _accompanying.ToList(),
-            certStoredPath);
+        try
+        {
+            _bookingService.CreateReservation(
+                guest, room,
+                _dtpCheckIn.Value.Date, _dtpCheckOut.Value.Date,
+                _accompanying.ToList(),
+                certificateId);
+        }
+        catch (ArgumentException ex) { Warn(ex.Message); return; }
+        catch (InvalidOperationException ex) { Warn(ex.Message); return; }
 
         DialogResult = DialogResult.OK;
         Close();
-    }
-
-    private static string CopyCertificate(string sourcePath)
-    {
-        var folder = Path.Combine(AppContext.BaseDirectory, "MarriageCerts");
-        Directory.CreateDirectory(folder);
-        var ext = Path.GetExtension(sourcePath);
-        var dest = Path.Combine(folder, $"{Guid.NewGuid():N}{ext}");
-        File.Copy(sourcePath, dest, overwrite: false);
-        return dest;
     }
 
     private void Warn(string msg) =>

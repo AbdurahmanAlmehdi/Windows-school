@@ -118,7 +118,7 @@ public class RoomServiceTests
     public void RemoveRoom_RemovesVacantCleanRoom()
     {
         var h = TestStoreFactory.Build();
-        var vacant = h.Store.Rooms.First(r => r.IsAvailable);
+        var vacant = TestStoreFactory.FirstAvailableRoom(h.Store);
 
         h.Rooms.RemoveRoom(vacant);
 

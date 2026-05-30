@@ -16,12 +16,25 @@ public class RestaurantService
 
     public RestaurantOrder CreateOrder(Stay stay, IEnumerable<OrderLine> lines)
     {
+        // FR-RST-4 / DEF-12: orders can only be created against an Active stay.
+        if (stay.Status != StayStatus.Active)
+            throw new InvalidOperationException(
+                $"Cannot create an order against a {stay.Status} stay; only Active stays accept orders.");
+
+        var linesList = lines.ToList();
+
+        // DC-4 / DEF-14: every OrderLine.Quantity must be >= 1.
+        foreach (var line in linesList)
+            if (line.Quantity < 1)
+                throw new ArgumentException(
+                    "OrderLine.Quantity must be >= 1.", nameof(lines));
+
         var order = new RestaurantOrder
         {
             Stay = stay,
             Status = OrderStatus.Placed
         };
-        foreach (var line in lines)
+        foreach (var line in linesList)
             order.Lines.Add(line);
 
         _store.Orders.Add(order);
@@ -30,21 +43,31 @@ public class RestaurantService
 
     public void AdvanceOrderStatus(RestaurantOrder order)
     {
+        // FR-RST-6 / DEF-13: a cancelled order cannot be advanced.
+        if (order.Status == OrderStatus.Cancelled)
+            throw new InvalidOperationException(
+                "Cannot advance a cancelled order.");
+
         order.Status = order.Status switch
         {
-            OrderStatus.Placed => OrderStatus.Preparing,
+            OrderStatus.Placed    => OrderStatus.Preparing,
             OrderStatus.Preparing => OrderStatus.Ready,
-            OrderStatus.Ready => OrderStatus.Served,
-            _ => order.Status
+            OrderStatus.Ready     => OrderStatus.Served,
+            _                     => order.Status // Served: silent no-op (legal terminal state)
         };
     }
 
     public void CancelOrder(RestaurantOrder order)
     {
-        if (order.Status is OrderStatus.Placed or OrderStatus.Preparing)
-        {
-            order.Status = OrderStatus.Cancelled;
-        }
+        // FR-RST-7: cancellation is only legal from Placed or Preparing.
+        // From Ready/Served/Cancelled we silently no-op (preserves existing API surface).
+        if (order.Status is not (OrderStatus.Placed or OrderStatus.Preparing))
+            return;
+
+        order.Status = OrderStatus.Cancelled;
+
+        // Cancelled orders must not contribute to the stay's restaurant charges.
+        RecomputeStayCharges(order.Stay);
     }
 
     public IEnumerable<RestaurantOrder> GetOrdersForStay(Stay stay) =>
@@ -86,15 +109,25 @@ public class RestaurantService
         if (order.Status is not (OrderStatus.Placed or OrderStatus.Preparing)) return;
 
         foreach (var line in newLines)
+        {
+            if (line.Quantity < 1)
+                throw new ArgumentException(
+                    "OrderLine.Quantity must be >= 1.", nameof(newLines));
             order.Lines.Add(line);
+        }
 
-        order.Stay.RestaurantCharges = _store.Orders
-            .Where(o => o.Stay == order.Stay && o.Status != OrderStatus.Cancelled)
-            .Sum(o => o.Total);
+        RecomputeStayCharges(order.Stay);
     }
 
     public decimal GetTodayServedRevenue() =>
         _store.Orders
             .Where(o => o.Status == OrderStatus.Served && o.CreatedAt.Date == DateTime.Today)
             .Sum(o => o.Total);
+
+    private void RecomputeStayCharges(Stay stay)
+    {
+        stay.RestaurantCharges = _store.Orders
+            .Where(o => o.Stay == stay && o.Status != OrderStatus.Cancelled)
+            .Sum(o => o.Total);
+    }
 }

@@ -66,6 +66,11 @@ public class InvoiceService
 
     public void MarkRefunded(Invoice invoice)
     {
+        // SRS §3.5.3 / DEF-16: only a Paid invoice may transition to Refunded.
+        if (invoice.PaymentStatus != PaymentStatus.Paid)
+            throw new InvalidOperationException(
+                $"Invoice {invoice.InvoiceNumber} is {invoice.PaymentStatus}; only Paid invoices can be refunded.");
+
         invoice.PaymentStatus = PaymentStatus.Refunded;
     }
 

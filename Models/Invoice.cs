@@ -6,6 +6,7 @@ public class Invoice
 {
     private static int _nextNumber = 1001;
 
+    public Guid Id { get; set; } = Guid.NewGuid();
     public string InvoiceNumber { get; set; }
     public Stay Stay { get; set; } = null!;
     public Guest Guest { get; set; } = null!;
@@ -29,5 +30,15 @@ public class Invoice
     public Invoice(string invoiceNumber)
     {
         InvoiceNumber = invoiceNumber;
+    }
+
+    // Used after loading existing invoices from SQL Server so newly-created
+    // invoices in the same session continue numbering from the right place.
+    // (Replaces the static-counter hazard noted in StaticTestReport.md SC-04
+    // until the codebase fully migrates to the dbo.seq_invoice_number
+    // sequence on the SQL side.)
+    public static void AdvanceSequenceTo(int next)
+    {
+        if (next > _nextNumber) _nextNumber = next;
     }
 }

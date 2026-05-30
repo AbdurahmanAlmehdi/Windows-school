@@ -35,6 +35,14 @@ public class RoomService
     {
         _auth.Require(PermissionResource.Rooms, PermissionAction.Create);
 
+        // DC-5 / DEF-09: rate must be non-negative.
+        if (rate < 0)
+            throw new ArgumentException("Room rate cannot be negative.", nameof(rate));
+
+        // FR-ROOM-9 / DEF-10: floor must be non-negative.
+        if (floor < 0)
+            throw new ArgumentException("Floor cannot be negative.", nameof(floor));
+
         if (_store.Rooms.Any(r => r.Number == number))
             throw new InvalidOperationException($"Room {number} already exists.");
 
@@ -46,6 +54,11 @@ public class RoomService
     public void UpdateRoom(Room room, int number, int floor, RoomType type, decimal rate)
     {
         _auth.Require(PermissionResource.Rooms, PermissionAction.Update);
+
+        if (rate < 0)
+            throw new ArgumentException("Room rate cannot be negative.", nameof(rate));
+        if (floor < 0)
+            throw new ArgumentException("Floor cannot be negative.", nameof(floor));
 
         if (_store.Rooms.Any(r => r.Number == number && r != room))
             throw new InvalidOperationException($"Room {number} already exists.");
@@ -62,6 +75,16 @@ public class RoomService
 
         if (room.IsOccupied)
             throw new InvalidOperationException("Cannot remove an occupied room.");
+
+        // FR-ROOM-4 (intent) / DEF-11: rooms with active reservations cannot be deleted.
+        var hasActiveReservation = _store.Reservations.Any(r =>
+            r.Room == room &&
+            (r.Status == ReservationStatus.Pending ||
+             r.Status == ReservationStatus.Confirmed ||
+             r.Status == ReservationStatus.CheckedIn));
+        if (hasActiveReservation)
+            throw new InvalidOperationException(
+                $"Cannot remove Room {room.Number}: one or more active reservations reference it.");
 
         _store.Rooms.Remove(room);
     }

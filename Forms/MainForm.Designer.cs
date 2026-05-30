@@ -12,6 +12,7 @@ partial class MainForm
     private Panel panelHeader = null!;
     private Label lblBrand = null!;
     private Button btnLogout = null!;
+    private Button btnSaveSql = null!;
 
     // Tab control
     private TabControl tabMain = null!;
@@ -114,6 +115,7 @@ partial class MainForm
     private Label lblRoomDetailGuest = null!;
     private Label lblRoomDetailMaintenance = null!;
     // Room condition action buttons
+    private Button btnReserveRoom = null!;
     private Button btnMarkClean = null!;
     private Button btnMarkNeedsCleaning = null!;
     private Button btnMarkOutOfService = null!;
@@ -162,6 +164,8 @@ partial class MainForm
 
     // Reports controls
     private Button btnRefreshReports = null!;
+    private Button btnExportOccupancyPdf = null!;
+    private Button btnExportRestaurantRevenuePdf = null!;
     private Panel pnlOccReport = null!;
     private Label lblOccReportValue = null!;
     private Panel pnlAvgStay = null!;
@@ -227,7 +231,23 @@ partial class MainForm
         btnLogout.FlatAppearance.BorderSize = 0;
         btnLogout.Click += BtnLogout_Click;
 
+        btnSaveSql = new Button
+        {
+            Text = "Save to SQL Server",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            ForeColor = AppColors.Primary,
+            BackColor = AppColors.Accent,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(170, 34),
+            Anchor = AnchorStyles.Top | AnchorStyles.Right,
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+        btnSaveSql.FlatAppearance.BorderSize = 0;
+        btnSaveSql.Click += BtnSaveSql_Click;
+
         panelHeader.Controls.Add(lblBrand);
+        panelHeader.Controls.Add(btnSaveSql);
         panelHeader.Controls.Add(btnLogout);
 
         // === TabControl ===
@@ -1006,6 +1026,22 @@ partial class MainForm
             Visible = false
         };
 
+        // Primary CTA for the Rooms tab - reserve this room (mid-term UI feedback).
+        btnReserveRoom = new Button
+        {
+            Text = "Reserve This Room",
+            Font = new Font("Segoe UI", 11, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(288, 40),
+            Location = new Point(20, 170),
+            Cursor = Cursors.Hand,
+            Visible = false
+        };
+        btnReserveRoom.FlatAppearance.BorderSize = 0;
+        btnReserveRoom.Click += BtnReserveRoom_Click;
+
         // Condition action buttons
         btnMarkClean = new Button
         {
@@ -1055,6 +1091,7 @@ partial class MainForm
         pnlRoomDetail.Controls.AddRange(new Control[] {
             lblRoomDetailTitle, lblRoomDetailType, lblRoomDetailRate,
             lblRoomDetailStatus, lblRoomDetailGuest, lblRoomDetailMaintenance,
+            btnReserveRoom,
             btnMarkClean, btnMarkNeedsCleaning, btnMarkOutOfService
         });
 
@@ -1806,6 +1843,36 @@ partial class MainForm
         btnRefreshReports.FlatAppearance.BorderSize = 0;
         btnRefreshReports.Click += BtnRefreshReports_Click;
         pnlRepHeader.Controls.Add(btnRefreshReports);
+
+        btnExportOccupancyPdf = new Button
+        {
+            Text = "Export Occupancy PDF",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(190, 34),
+            Location = new Point(110, 40),
+            Cursor = Cursors.Hand
+        };
+        btnExportOccupancyPdf.FlatAppearance.BorderSize = 0;
+        btnExportOccupancyPdf.Click += BtnExportOccupancyPdf_Click;
+        pnlRepHeader.Controls.Add(btnExportOccupancyPdf);
+
+        btnExportRestaurantRevenuePdf = new Button
+        {
+            Text = "Export Revenue PDF",
+            Font = new Font("Segoe UI", 10, FontStyle.Bold),
+            BackColor = AppColors.Accent,
+            ForeColor = AppColors.Primary,
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(180, 34),
+            Location = new Point(310, 40),
+            Cursor = Cursors.Hand
+        };
+        btnExportRestaurantRevenuePdf.FlatAppearance.BorderSize = 0;
+        btnExportRestaurantRevenuePdf.Click += BtnExportRestaurantRevenuePdf_Click;
+        pnlRepHeader.Controls.Add(btnExportRestaurantRevenuePdf);
 
         tabReports.Controls.Add(pnlRepHeader);
 

@@ -2,6 +2,7 @@ namespace HotelManagement.WinForms.Models;
 
 public class Guest
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public string Contact { get; set; } = string.Empty;
     public string Passport { get; set; } = string.Empty;

@@ -2,6 +2,7 @@ namespace HotelManagement.WinForms.Models;
 
 public class OrderLine
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     public MenuItem MenuItem { get; set; } = null!;
     public int Quantity { get; set; } = 1;
     public string Notes { get; set; } = string.Empty;

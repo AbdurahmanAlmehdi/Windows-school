@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using HotelManagement.WinForms.Data;
 using HotelManagement.WinForms.Models;
+using HotelManagement.WinForms.Persistence;
 using HotelManagement.WinForms.Services;
 using HotelManagement.WinForms.Theme;
 
@@ -16,6 +17,7 @@ public partial class MainForm : Form
     private readonly InvoiceService _invoiceService;
     private readonly UserService _userService;
     private readonly DataStore _store;
+    private readonly PersistenceManager? _persistence;
 
     private Room? _selectedRoom;
     private Models.MenuItem? _selectedMenuItem;
@@ -29,7 +31,8 @@ public partial class MainForm : Form
         ReportService reportService,
         InvoiceService invoiceService,
         UserService userService,
-        DataStore dataStore)
+        DataStore dataStore,
+        PersistenceManager? persistence = null)
     {
         _authService = authService;
         _roomService = roomService;
@@ -39,6 +42,7 @@ public partial class MainForm : Form
         _invoiceService = invoiceService;
         _userService = userService;
         _store = dataStore;
+        _persistence = persistence;
 
         InitializeComponent();
 
@@ -47,8 +51,11 @@ public partial class MainForm : Form
         // Position logout button
         btnLogout.Location = new Point(panelHeader.Width - btnLogout.Width - 12, 8);
 
-        // Hide Reports tab for now
-        tabMain.TabPages.Remove(tabReports);
+        btnSaveSql.Location = new Point(btnLogout.Location.X - btnSaveSql.Width - 8, 8);
+        btnSaveSql.Visible = _persistence != null;
+
+        // Reports tab now contains the PDF export buttons (Phase 4), so it
+        // stays visible for any signed-in user.
 
         // Hide the Users tab when the current role can't even read users.
         if (!_authService.Can(PermissionResource.Users, PermissionAction.Read))
@@ -90,6 +97,34 @@ public partial class MainForm : Form
     {
         _authService.Logout();
         Close();
+    }
+
+    private void BtnSaveSql_Click(object? sender, EventArgs e)
+    {
+        if (_persistence == null) return;
+
+        try
+        {
+            Cursor = Cursors.WaitCursor;
+            _persistence.SaveFrom(_store);
+            MessageBox.Show(this,
+                "All in-memory data has been written to SQL Server.",
+                "Saved",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Could not save to SQL Server.\n\n{ex.Message}",
+                "Save failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            Cursor = Cursors.Default;
+        }
     }
 
     // ===================== DASHBOARD =====================
@@ -781,6 +816,7 @@ public partial class MainForm : Form
             lblRoomDetailStatus.Visible = false;
             lblRoomDetailGuest.Visible = false;
             lblRoomDetailMaintenance.Visible = false;
+            btnReserveRoom.Visible = false;
             btnMarkClean.Visible = false;
             btnMarkNeedsCleaning.Visible = false;
             btnMarkOutOfService.Visible = false;
@@ -819,10 +855,32 @@ public partial class MainForm : Form
             lblRoomDetailMaintenance.Visible = true;
         }
 
+        btnReserveRoom.Visible = room.IsAvailable
+            && _authService.Can(PermissionResource.Reservations, PermissionAction.Create);
+
         // Show condition buttons
         btnMarkClean.Visible = true;
         btnMarkNeedsCleaning.Visible = true;
         btnMarkOutOfService.Visible = true;
+    }
+
+    private void BtnReserveRoom_Click(object? sender, EventArgs e)
+    {
+        if (_selectedRoom == null) return;
+        if (!_selectedRoom.IsAvailable)
+        {
+            MessageBox.Show(this,
+                $"Room {_selectedRoom.Number} is not available for booking.",
+                "Unavailable", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        using var dlg = new ReservationDialog(_store, _roomService, _bookingService, _selectedRoom);
+        if (dlg.ShowDialog(this) == DialogResult.OK)
+        {
+            RefreshRooms();
+            RefreshReservations();
+        }
     }
 
     private void BtnRoomMarkClean_Click(object? sender, EventArgs e)
@@ -1961,6 +2019,57 @@ public partial class MainForm : Form
     }
 
     private void BtnRefreshReports_Click(object? sender, EventArgs e) => RefreshReports();
+
+    private void BtnExportOccupancyPdf_Click(object? sender, EventArgs e)
+    {
+        ExportPdf(
+            defaultName: $"occupancy_{DateTime.Now:yyyy-MM-dd_HHmm}.pdf",
+            generate: path => Reports.OccupancyReportPdf.Save(_store, _reportService, DateTime.Now, path));
+    }
+
+    private void BtnExportRestaurantRevenuePdf_Click(object? sender, EventArgs e)
+    {
+        ExportPdf(
+            defaultName: $"restaurant_revenue_{DateTime.Now:yyyy-MM-dd_HHmm}.pdf",
+            generate: path => Reports.RestaurantRevenuePdf.Save(_reportService, _invoiceService, DateTime.Now, path));
+    }
+
+    private void ExportPdf(string defaultName, Action<string> generate)
+    {
+        using var dlg = new SaveFileDialog
+        {
+            Title = "Save report as PDF",
+            Filter = "PDF document (*.pdf)|*.pdf",
+            FileName = defaultName,
+            DefaultExt = "pdf",
+            AddExtension = true,
+            OverwritePrompt = true,
+        };
+        if (dlg.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            Cursor = Cursors.WaitCursor;
+            generate(dlg.FileName);
+            MessageBox.Show(this,
+                $"Saved to:\n{dlg.FileName}",
+                "PDF exported",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                $"Could not generate PDF.\n\n{ex.Message}",
+                "Export failed",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Error);
+        }
+        finally
+        {
+            Cursor = Cursors.Default;
+        }
+    }
 
     // ===================== USERS & ROLES =====================
 
